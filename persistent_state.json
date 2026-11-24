@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "updated_at": "2026-11-24T22:41:26.955096",
+  "tables": {
+    "users": [
+      {
+        "id": 1,
+        "username": "morgan",
+        "display_name": "Morgan",
+        "password_hash": "a58c1003af0e5ee7cfd4bce6ca43d65896a1c0cb0c104b46b679a27e9c1c7f22",
+        "password_salt": "0c164aacbe076ebfb87c7a4b082c5123",
+        "role": "admin",
+        "can_edit_dishes": 1,
+        "avatar_color": "#c0392b",
+        "created_at": "2026-11-24T22:41:26.947513",
+        "last_login_at": "2026-11-24T22:41:26.947513"
+      }
+    ],
+    "sessions": [],
+    "dishes": [],
+    "claims": [],
+    "meat_votes": [],
+    "drinks": [],
+    "drink_selections": [],
+    "settings": [
+      {
+        "key": "house_name",
+        "value": "82 Harrow"
+      },
+      {
+        "key": "event_title",
+        "value": "82 Harrow Christmas Dinner"
+      },
+      {
+        "key": "event_date",
+        "value": "December 2026"
+      },
+      {
+        "key": "event_time",
+        "value": "7:00 PM"
+      },
+      {
+        "key": "announcement",
+        "value": "Welcome to the 82 Harrow Christmas Dinner dashboard! Assign dishes to yourself, add Recipe URLs, vote in the Secondary Meat Poll, and pick your Drinks!"
+      },
+      {
+        "key": "house_code",
+        "value": ""
+      },
+      {
+        "key": "lock_claims",
+        "value": "false"
+      }
+    ]
+  }
+}
