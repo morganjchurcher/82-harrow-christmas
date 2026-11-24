@@ -1,0 +1,22 @@
+{
+  "name": "82 Harrow Christmas Dinner",
+  "short_name": "82 Harrow",
+  "description": "82 Harrow University House Christmas Dinner Organisation Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1d13",
+  "theme_color": "#10291b",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png?v=2",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png?v=2",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

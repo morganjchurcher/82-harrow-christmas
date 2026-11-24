@@ -1109,11 +1109,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             ".json": "application/json; charset=utf-8",
             ".svg": "image/svg+xml",
             ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
             ".ico": "image/x-icon",
         }
         ctype = content_types.get(ext, "application/octet-stream")
         with open(full_path, "rb") as f:
             content = f.read()
+
+        if ext == ".html":
+            host = (self.headers.get("Host") or f"localhost:{PORT}").strip()
+            proto = (self.headers.get("X-Forwarded-Proto") or "").strip().lower()
+            if not proto:
+                proto = "https" if ("onrender.com" in host or "railway.app" in host) else "http"
+            base_url = f"{proto}://{host}"
+            content = content.replace(b"__BASE_URL__", base_url.encode("utf-8"))
+
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(content)))
