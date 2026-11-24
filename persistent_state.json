@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-24T22:41:27.162502",
+  "updated_at": "2026-11-24T22:41:40.717169",
   "tables": {
     "users": [
       {
@@ -25,7 +25,13 @@
     ],
     "dishes": [],
     "claims": [],
-    "meat_votes": [],
+    "meat_votes": [
+      {
+        "user_id": 1,
+        "choice": "gammon",
+        "voted_at": "2026-11-24T22:41:40.710150"
+      }
+    ],
     "drinks": [],
     "drink_selections": [],
     "settings": [
