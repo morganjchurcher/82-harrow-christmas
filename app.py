@@ -5,6 +5,7 @@ All-in-one Web Server + SQLite Database + Recipe URL Scraper + 7-Person Cost Est
 Run locally: python3 app.py
 """
 
+import base64
 import gzip
 import hashlib
 import hmac
@@ -35,7 +36,17 @@ DB_PATH = os.path.join(DATA_DIR, "harrow82_christmas.db")
 PORT = int(os.environ.get("PORT", "8080"))
 HOUSE_SIZE = 7  # 82 Harrow dinner size for ingredient scaling & cost splitting
 
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "morganjchurcher/82-harrow-christmas")
+GITHUB_DATA_BRANCH = os.environ.get("GITHUB_DATA_BRANCH", "data-store")
+GITHUB_STATE_PATH = "persistent_state.json"
+
 DB_LOCK = threading.Lock()
+CLOUD_SYNC_LOCK = threading.Lock()
+CLOUD_SYNC_CONDITION = threading.Condition(CLOUD_SYNC_LOCK)
+_PENDING_CLOUD_SNAPSHOT = None
+_RUNTIME_GITHUB_TOKEN = ""
+_LAST_CLOUD_SYNC_STATUS = "initializing"
+_CACHED_REMOTE_SHA = None
 
 AVATAR_COLORS = [
     "#c0392b",  # Cranberry Red
@@ -117,6 +128,336 @@ def select_drink_emoji(name: str, notes: str = "") -> str:
     if "wine" in text:
         return "🍷"
     return "🍹"
+
+
+# =====================================================================
+# FREE CLOUD PERSISTENCE ENGINE (GITHUB 'data-store' BRANCH BACKUP)
+# =====================================================================
+
+def get_github_token() -> str:
+    global _RUNTIME_GITHUB_TOKEN
+    env_tok = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or "").strip()
+    if env_tok:
+        return env_tok
+    if _RUNTIME_GITHUB_TOKEN:
+        return _RUNTIME_GITHUB_TOKEN
+    # Fallback: read from local .git/config if running locally
+    git_cfg_path = os.path.join(BASE_DIR, ".git", "config")
+    if os.path.isfile(git_cfg_path):
+        try:
+            with open(git_cfg_path, "r", encoding="utf-8") as f:
+                cfg_text = f.read()
+            m = re.search(r"https://[^:@\s]+:([^@\s]+)@github\.com", cfg_text)
+            if m:
+                _RUNTIME_GITHUB_TOKEN = m.group(1).strip()
+                return _RUNTIME_GITHUB_TOKEN
+        except Exception:
+            pass
+    return ""
+
+
+def export_full_db_state(conn) -> dict:
+    """Export all SQLite tables into a JSON-serializable snapshot for cloud persistence."""
+    tables = [
+        "users",
+        "sessions",
+        "dishes",
+        "claims",
+        "meat_votes",
+        "drinks",
+        "drink_selections",
+        "settings",
+    ]
+    snapshot = {
+        "version": 1,
+        "updated_at": datetime.utcnow().isoformat(),
+        "tables": {},
+    }
+    for tbl in tables:
+        rows = conn.execute(f"SELECT * FROM {tbl}").fetchall()
+        snapshot["tables"][tbl] = [dict(r) for r in rows]
+    return snapshot
+
+
+def import_full_db_state(conn, snapshot: dict) -> bool:
+    """Restore all SQLite tables from a cloud snapshot."""
+    if not isinstance(snapshot, dict) or "tables" not in snapshot:
+        return False
+    tables_data = snapshot["tables"]
+    if not isinstance(tables_data, dict):
+        return False
+
+    conn.execute("PRAGMA foreign_keys=OFF;")
+    try:
+        # Clear and repopulate in dependency order
+        for tbl in ["drink_selections", "drinks", "meat_votes", "claims", "dishes", "sessions", "users", "settings"]:
+            if tbl in tables_data and isinstance(tables_data[tbl], list):
+                conn.execute(f"DELETE FROM {tbl}")
+
+        for u in tables_data.get("users", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO users (
+                    id, username, display_name, password_hash, password_salt,
+                    role, can_edit_dishes, avatar_color, created_at, last_login_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    u.get("id"),
+                    u.get("username"),
+                    u.get("display_name"),
+                    u.get("password_hash"),
+                    u.get("password_salt"),
+                    u.get("role", "housemate"),
+                    int(bool(u.get("can_edit_dishes", 0))),
+                    u.get("avatar_color", "#c0392b"),
+                    u.get("created_at", ""),
+                    u.get("last_login_at", ""),
+                ),
+            )
+
+        for s in tables_data.get("sessions", []):
+            conn.execute(
+                "INSERT OR REPLACE INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
+                (s.get("token"), s.get("user_id"), s.get("created_at", int(time.time()))),
+            )
+
+        for d in tables_data.get("dishes", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO dishes (
+                    id, title, category, notes, max_claims, sort_order, created_by, created_at,
+                    recipe_url, recipe_title, recipe_description, recipe_prep_time, recipe_cook_time,
+                    recipe_ingredients, recipe_image, recipe_added_by, recipe_servings, recipe_custom_items
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    d.get("id"),
+                    d.get("title", ""),
+                    d.get("category", "Sides & Trimmings"),
+                    d.get("notes", ""),
+                    int(d.get("max_claims", 1)),
+                    int(d.get("sort_order", 0)),
+                    d.get("created_by"),
+                    d.get("created_at", ""),
+                    d.get("recipe_url", ""),
+                    d.get("recipe_title", ""),
+                    d.get("recipe_description", ""),
+                    d.get("recipe_prep_time", ""),
+                    d.get("recipe_cook_time", ""),
+                    d.get("recipe_ingredients", "[]")
+                    if isinstance(d.get("recipe_ingredients"), str)
+                    else json.dumps(d.get("recipe_ingredients") or []),
+                    d.get("recipe_image", ""),
+                    d.get("recipe_added_by", ""),
+                    int(d.get("recipe_servings", 4)),
+                    d.get("recipe_custom_items", "[]")
+                    if isinstance(d.get("recipe_custom_items"), str)
+                    else json.dumps(d.get("recipe_custom_items") or []),
+                ),
+            )
+
+        for c in tables_data.get("claims", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO claims (id, dish_id, user_id, note, status, claimed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    c.get("id"),
+                    c.get("dish_id"),
+                    c.get("user_id"),
+                    c.get("note", ""),
+                    c.get("status", "claimed"),
+                    c.get("claimed_at", ""),
+                ),
+            )
+
+        for mv in tables_data.get("meat_votes", []):
+            conn.execute(
+                "INSERT OR REPLACE INTO meat_votes (user_id, choice, voted_at) VALUES (?, ?, ?)",
+                (mv.get("user_id"), mv.get("choice"), mv.get("voted_at", "")),
+            )
+
+        for dr in tables_data.get("drinks", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO drinks (id, name, emoji, notes, created_by, created_by_name, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    dr.get("id"),
+                    dr.get("name", ""),
+                    dr.get("emoji", "🍹"),
+                    dr.get("notes", ""),
+                    dr.get("created_by"),
+                    dr.get("created_by_name", ""),
+                    dr.get("created_at", ""),
+                ),
+            )
+
+        for ds in tables_data.get("drink_selections", []):
+            conn.execute(
+                "INSERT OR REPLACE INTO drink_selections (user_id, drink_id, selected_at) VALUES (?, ?, ?)",
+                (ds.get("user_id"), ds.get("drink_id"), ds.get("selected_at", "")),
+            )
+
+        for st in tables_data.get("settings", []):
+            if st.get("key"):
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    (st.get("key"), str(st.get("value", ""))),
+                )
+
+        conn.commit()
+        return True
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON;")
+
+
+def restore_db_from_cloud(conn) -> bool:
+    """Pull persistent_state.json from GitHub 'data-store' branch on server startup."""
+    global _CACHED_REMOTE_SHA, _LAST_CLOUD_SYNC_STATUS
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_STATE_PATH}?ref={GITHUB_DATA_BRANCH}"
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "82-Harrow-Christmas-Dashboard",
+    }
+    tok = get_github_token()
+    if tok:
+        headers["Authorization"] = f"Bearer {tok}"
+
+    req = urllib.request.Request(api_url, headers=headers)
+    ctx = ssl._create_unverified_context()
+    try:
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        _CACHED_REMOTE_SHA = payload.get("sha")
+        b64_content = payload.get("content") or ""
+        raw_json = base64.b64decode(b64_content).decode("utf-8")
+        snapshot = json.loads(raw_json)
+        if import_full_db_state(conn, snapshot):
+            _LAST_CLOUD_SYNC_STATUS = "restored"
+            print(f"[Cloud Sync] Restored persistent database state from {GITHUB_REPO}@{GITHUB_DATA_BRANCH}!")
+            return True
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            _LAST_CLOUD_SYNC_STATUS = "ready_first_save"
+            print(f"[Cloud Sync] No remote {GITHUB_STATE_PATH} found yet on {GITHUB_DATA_BRANCH}; will create on first save.")
+        else:
+            _LAST_CLOUD_SYNC_STATUS = f"read_error_{e.code}"
+            print(f"[Cloud Sync] HTTP {e.code} checking remote state: {e}")
+    except Exception as exc:
+        _LAST_CLOUD_SYNC_STATUS = "offline"
+        print(f"[Cloud Sync] Could not reach GitHub on startup: {exc}")
+    return False
+
+
+def push_snapshot_to_github(snapshot: dict) -> bool:
+    """Write snapshot JSON to persistent_state.json on GitHub 'data-store' branch."""
+    global _CACHED_REMOTE_SHA, _LAST_CLOUD_SYNC_STATUS
+    tok = get_github_token()
+    if not tok:
+        _LAST_CLOUD_SYNC_STATUS = "missing_token"
+        return False
+
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_STATE_PATH}"
+    headers = {
+        "Authorization": f"Bearer {tok}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json; charset=utf-8",
+        "User-Agent": "82-Harrow-Christmas-Dashboard",
+    }
+    ctx = ssl._create_unverified_context()
+
+    # Fetch current file SHA if we don't have it cached yet
+    if not _CACHED_REMOTE_SHA:
+        try:
+            get_req = urllib.request.Request(f"{api_url}?ref={GITHUB_DATA_BRANCH}", headers=headers)
+            with urllib.request.urlopen(get_req, timeout=8, context=ctx) as resp:
+                info = json.loads(resp.read().decode("utf-8"))
+                _CACHED_REMOTE_SHA = info.get("sha")
+        except Exception:
+            _CACHED_REMOTE_SHA = None
+
+    raw_bytes = json.dumps(snapshot, indent=2).encode("utf-8")
+    b64_str = base64.b64encode(raw_bytes).decode("ascii")
+
+    for attempt in range(2):
+        body = {
+            "message": f"Auto-save 82 Harrow state ({snapshot.get('updated_at', '')})",
+            "content": b64_str,
+            "branch": GITHUB_DATA_BRANCH,
+        }
+        if _CACHED_REMOTE_SHA:
+            body["sha"] = _CACHED_REMOTE_SHA
+
+        put_req = urllib.request.Request(
+            api_url,
+            data=json.dumps(body).encode("utf-8"),
+            headers=headers,
+            method="PUT",
+        )
+        try:
+            with urllib.request.urlopen(put_req, timeout=12, context=ctx) as resp:
+                res_data = json.loads(resp.read().decode("utf-8"))
+                content_obj = res_data.get("content") or {}
+                if content_obj.get("sha"):
+                    _CACHED_REMOTE_SHA = content_obj["sha"]
+                _LAST_CLOUD_SYNC_STATUS = "synced"
+                return True
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422) and attempt == 0:
+                # Refresh SHA and retry once
+                try:
+                    get_req = urllib.request.Request(f"{api_url}?ref={GITHUB_DATA_BRANCH}", headers=headers)
+                    with urllib.request.urlopen(get_req, timeout=8, context=ctx) as resp:
+                        info = json.loads(resp.read().decode("utf-8"))
+                        _CACHED_REMOTE_SHA = info.get("sha")
+                except Exception:
+                    _CACHED_REMOTE_SHA = None
+                continue
+            _LAST_CLOUD_SYNC_STATUS = f"write_error_{e.code}"
+            print(f"[Cloud Sync] HTTP {e.code} saving state to GitHub: {e}")
+            return False
+        except Exception as exc:
+            _LAST_CLOUD_SYNC_STATUS = "write_failed"
+            print(f"[Cloud Sync] Error saving state to GitHub: {exc}")
+            return False
+    return False
+
+
+def _cloud_sync_worker():
+    global _PENDING_CLOUD_SNAPSHOT
+    while True:
+        with CLOUD_SYNC_CONDITION:
+            while _PENDING_CLOUD_SNAPSHOT is None:
+                CLOUD_SYNC_CONDITION.wait()
+            snapshot = _PENDING_CLOUD_SNAPSHOT
+            _PENDING_CLOUD_SNAPSHOT = None
+        try:
+            push_snapshot_to_github(snapshot)
+        except Exception as exc:
+            print(f"[Cloud Sync Worker] Unexpected error: {exc}")
+
+
+_SYNC_THREAD = threading.Thread(target=_cloud_sync_worker, daemon=True)
+_SYNC_THREAD.start()
+
+
+def commit_and_sync(conn):
+    """Commit transaction to local SQLite AND queue permanent backup to GitHub 'data-store' branch."""
+    global _PENDING_CLOUD_SNAPSHOT
+    conn.commit()
+    try:
+        snapshot = export_full_db_state(conn)
+        with CLOUD_SYNC_CONDITION:
+            _PENDING_CLOUD_SNAPSHOT = snapshot
+            CLOUD_SYNC_CONDITION.notify()
+    except Exception as exc:
+        print(f"[Cloud Sync] Failed to export snapshot: {exc}")
 
 
 def init_db():
@@ -264,6 +605,9 @@ def init_db():
                     (k, v),
                 )
             conn.commit()
+
+            # Restore saved database state from GitHub 'data-store' branch if available
+            restore_db_from_cloud(conn)
         finally:
             conn.close()
 
@@ -1225,7 +1569,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
                         (token, user_id, int(time.time())),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
 
                     user_row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
                     user = user_row_to_dict(user_row)
@@ -1240,7 +1584,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     if not username or not password:
                         return self.send_json(400, {"error": "Please enter your username and password."})
 
-                    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+                    row = conn.execute(
+                        "SELECT * FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(display_name) = LOWER(?)",
+                        (username, username),
+                    ).fetchone()
 
                     if not row and is_morgan_user(username) and len(password) >= 4:
                         pwd_hash, salt = hash_password(password)
@@ -1255,7 +1602,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             """,
                             (username, "Morgan", pwd_hash, salt, AVATAR_COLORS[0], now_iso, now_iso),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         row = conn.execute("SELECT * FROM users WHERE id = ?", (cur.lastrowid,)).fetchone()
 
                     if not row or not verify_password(password, row["password_hash"], row["password_salt"]):
@@ -1278,7 +1625,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
                         (token, row["id"], int(time.time())),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
 
                     updated_row = conn.execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone()
                     user = user_row_to_dict(updated_row)
@@ -1291,7 +1638,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     token = self.get_session_token()
                     if token:
                         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-                        conn.commit()
+                        commit_and_sync(conn)
                     state = fetch_dashboard_state(conn, None)
                     return self.send_json(200, state, clear_cookie=True)
 
@@ -1331,7 +1678,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (title, category, notes, max_claims, max_sort + 1, user["id"], datetime.utcnow().isoformat()),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 5. UPDATE DISH / ROLE
@@ -1358,7 +1705,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (title, category, notes, max_claims, dish_id),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 6. DELETE DISH / ROLE
@@ -1367,7 +1714,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         return self.send_json(403, {"error": "You need Dish Editor or Administrator privileges to delete dishes."})
                     dish_id = data.get("dish_id")
                     conn.execute("DELETE FROM dishes WHERE id = ?", (dish_id,))
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 7. ADD OR UPDATE RECIPE URL ON A DISH
@@ -1392,7 +1739,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             """,
                             (dish_id,),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     if manual_override:
@@ -1460,7 +1807,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             dish_id,
                         ),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 7B. ADMIN UPDATE COMPILED 7-PERSON INGREDIENT AMOUNT OR COST
@@ -1503,7 +1850,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "UPDATE dishes SET recipe_custom_items = ? WHERE id = ?",
                         (json.dumps(custom_items), dish_id),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 8. ASSIGN DISH TO ME (/api/dishes/claim)
@@ -1547,7 +1894,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (dish_id, target_user_id, note, datetime.utcnow().isoformat()),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 9. UNASSIGN DISH (/api/dishes/unclaim)
@@ -1567,7 +1914,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "DELETE FROM claims WHERE dish_id = ? AND user_id = ?",
                         (dish_id, target_user_id),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 10. UPDATE CLAIM NOTE OR STATUS
@@ -1591,7 +1938,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "UPDATE claims SET note = ?, status = ? WHERE id = ?",
                         (new_note, new_status, claim_id),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 11. MEAT POLL VOTE (EVERYONE CAN VOTE; ADMIN CAN ALSO EDIT ANYONE'S VOTE)
@@ -1604,7 +1951,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     )
                     if choice == "clear" or choice == "":
                         conn.execute("DELETE FROM meat_votes WHERE user_id = ?", (target_user_id,))
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     if choice not in VALID_MEAT_IDS:
@@ -1617,7 +1964,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (target_user_id, choice, datetime.utcnow().isoformat()),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 12. DRINKS: ADD DRINK OPTION (EVERYONE CAN UPLOAD DRINK OPTIONS)
@@ -1635,7 +1982,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (name, emoji, notes, user["id"], user["display_name"], datetime.utcnow().isoformat()),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 13. DRINKS: SELECT / SWITCH ONE DRINK OPTION (OR ADMIN ASSIGN)
@@ -1648,14 +1995,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     )
                     if not drink_id or drink_id == "clear":
                         conn.execute("DELETE FROM drink_selections WHERE user_id = ?", (target_user_id,))
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     drink_row = conn.execute("SELECT id FROM drinks WHERE id = ?", (drink_id,)).fetchone()
                     if not drink_row:
                         return self.send_json(404, {"error": "Drink option not found."})
 
-                    # Each person gets ONE drink selection (INSERT OR REPLACE switches their choice automatically)
                     conn.execute(
                         """
                         INSERT OR REPLACE INTO drink_selections (user_id, drink_id, selected_at)
@@ -1663,7 +2009,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         """,
                         (target_user_id, int(drink_id), datetime.utcnow().isoformat()),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 14. DRINKS: EDIT OR DELETE DRINK OPTION (ADMIN OR CREATOR)
@@ -1684,7 +2030,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         "UPDATE drinks SET name = ?, emoji = ?, notes = ? WHERE id = ?",
                         (name, emoji, notes, drink_id),
                     )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 if path == "/api/drinks/delete":
@@ -1695,13 +2041,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     if not is_admin and dr["created_by"] != user["id"]:
                         return self.send_json(403, {"error": "Only the Administrator or creator can delete this drink."})
                     conn.execute("DELETE FROM drinks WHERE id = ?", (drink_id,))
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 15. UPDATE SETTINGS (ADMIN ONLY)
                 if path == "/api/settings/update":
                     if not is_admin:
                         return self.send_json(403, {"error": "Only an Administrator can update settings."})
+                    global _RUNTIME_GITHUB_TOKEN
+                    if (data.get("github_token") or "").strip():
+                        _RUNTIME_GITHUB_TOKEN = data["github_token"].strip()
                     allowed_keys = ("event_title", "event_date", "event_time", "announcement", "house_code", "lock_claims")
                     for key in allowed_keys:
                         if key in data:
@@ -1714,7 +2063,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                                 (key, val),
                             )
-                    conn.commit()
+                    commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
                 # 16. ADMIN USER & PRIVILEGES MANAGEMENT (INCLUDING EDITING PEOPLE'S NAMES)
@@ -1735,7 +2084,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             "UPDATE users SET display_name = ? WHERE id = ?",
                             (new_display_name, target_id),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         updated_me = self.get_current_user(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, updated_me))
 
@@ -1747,7 +2096,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             "UPDATE users SET can_edit_dishes = ? WHERE id = ?",
                             (new_val, target_id),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     if action == "toggle_admin":
@@ -1761,7 +2110,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             "UPDATE users SET role = ?, can_edit_dishes = ? WHERE id = ?",
                             (new_role, new_editor, target_id),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     if action == "reset_password":
@@ -1773,14 +2122,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             "UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?",
                             (pwd_hash, salt, target_id),
                         )
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     if action == "delete_user":
                         if target_id == user["id"]:
                             return self.send_json(400, {"error": "You cannot delete your own account."})
                         conn.execute("DELETE FROM users WHERE id = ?", (target_id,))
-                        conn.commit()
+                        commit_and_sync(conn)
                         return self.send_json(200, fetch_dashboard_state(conn, user))
 
                     return self.send_json(400, {"error": "Invalid user management action."})

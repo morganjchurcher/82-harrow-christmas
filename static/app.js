@@ -191,7 +191,12 @@ function showToast(message) {
   }, 3400);
 }
 
+let mutationEpoch = 0;
+
 async function apiRequest(path, method = "GET", body = null) {
+  if (method !== "GET") {
+    mutationEpoch += 1;
+  }
   const headers = { "Content-Type": "application/json" };
   const token = getStoredToken();
   if (token) {
@@ -203,6 +208,9 @@ async function apiRequest(path, method = "GET", body = null) {
   }
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({}));
+  if (method !== "GET") {
+    mutationEpoch += 1;
+  }
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.payload = data;
@@ -2105,8 +2113,13 @@ function updateState(newState, forceRender = false) {
 }
 
 async function fetchState(forceRender = false) {
+  const epochBefore = mutationEpoch;
   try {
     const state = await apiRequest("/api/state");
+    if (!forceRender && mutationEpoch !== epochBefore) {
+      // A user action occurred while this background poll was in flight; ignore stale response
+      return;
+    }
     updateState(state, forceRender);
   } catch (err) {
     console.error("Failed to fetch state:", err);
@@ -2316,16 +2329,19 @@ function initEventListeners() {
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
+      const ghTokEl = document.getElementById("set-github-token");
       const newState = await apiRequest("/api/settings/update", "POST", {
         event_title: document.getElementById("set-event-title").value.trim(),
         event_date: document.getElementById("set-event-date").value.trim(),
         event_time: document.getElementById("set-event-time").value.trim(),
         announcement: document.getElementById("set-announcement").value.trim(),
         house_code: document.getElementById("set-house-code").value.trim(),
+        github_token: ghTokEl ? ghTokEl.value.trim() : "",
         lock_claims: document.getElementById("set-lock-claims").checked,
       });
+      if (ghTokEl) ghTokEl.value = "";
       updateState(newState, true);
-      showToast("Saved event settings!");
+      showToast("Saved event settings & backed up to cloud!");
     } catch (err) {
       showToast(err.message);
     }
