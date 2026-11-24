@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>82 Harrow • Christmas Dinner Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Animated Falling Snow Canvas -->
+  <canvas id="snow-canvas" aria-hidden="true"></canvas>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- Edit Dish Modal (Admin & Dish Editors) -->
+  <div id="edit-dish-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>✏️ Edit Dish or Component</h3>
+        <button type="button" id="close-edit-modal" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="edit-dish-form">
+        <input type="hidden" id="edit-dish-id" />
+        <div class="form-group">
+          <label for="edit-dish-title">Dish / Component Name</label>
+          <input type="text" id="edit-dish-title" required placeholder="e.g. Goose Fat Roast Potatoes" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-dish-category">Category</label>
+            <select id="edit-dish-category">
+              <option value="Mains">🦃 Mains</option>
+              <option value="Sides & Trimmings">🥔 Sides & Trimmings</option>
+              <option value="Drinks">🍷 Drinks</option>
+              <option value="Puddings & Desserts">🥧 Puddings & Desserts</option>
+              <option value="Table & Setup">🎄 Table & Setup</option>
+              <option value="Cleanup & Kitchen Roles">🧽 Cleanup & Kitchen Roles</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="edit-dish-spots">People Needed</label>
+            <input type="number" id="edit-dish-spots" min="1" max="20" value="1" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-dish-notes">Notes / Details (optional)</label>
+          <input type="text" id="edit-dish-notes" placeholder="e.g. Enough for 8 people, vegetarian option" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancel-edit-dish" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AUTH VIEW -->
+  <main id="auth-view" class="auth-wrapper hidden">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="house-pill">🏠 82 HARROW • UNI HOUSE</span>
+        <h1>🎄 Christmas Dinner</h1>
+        <p class="auth-subtitle">Log in to your account to see the Christmas dinner list, click "Assign to me", and view or add recipes.</p>
+      </div>
+
+      <!-- Morgan / First User Admin Setup Banner -->
+      <div id="first-admin-banner" class="first-admin-banner hidden">
+        <strong>👑 Morgan's Administrator Account Ready</strong>
+        <p>Log in or sign up with username <strong>Morgan</strong> to automatically receive full <strong>Administrator &amp; Dish Editor privileges</strong>.</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" id="tab-login" class="auth-tab active">Log In</button>
+        <button type="button" id="tab-register" class="auth-tab">Create Account</button>
+      </div>
+
+      <div id="auth-error" class="alert-error hidden"></div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" autocomplete="username" required placeholder="e.g. Morgan" />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" required placeholder="Your password (min 4 chars)" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log In to 82 Harrow →</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="auth-form hidden">
+        <div class="form-group">
+          <label for="reg-display-name">Your Name</label>
+          <input type="text" id="reg-display-name" required placeholder="e.g. Morgan" />
+        </div>
+        <div class="form-group">
+          <label for="reg-username">Choose a Username (to log back in later)</label>
+          <input type="text" id="reg-username" autocomplete="username" required placeholder="e.g. morgan" />
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Choose a Password (min 4 chars)</label>
+          <input type="password" id="reg-password" autocomplete="new-password" required placeholder="Create a password" />
+        </div>
+        <div id="house-code-group" class="form-group hidden">
+          <label for="reg-house-code">82 Harrow Invite Code</label>
+          <input type="text" id="reg-house-code" placeholder="Enter house code from Morgan" />
+        </div>
+        <button type="submit" id="register-submit-btn" class="btn btn-primary btn-block">Create Account &amp; Enter →</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="dashboard-view" class="dashboard-wrapper hidden">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-inner">
+        <div class="brand-cluster">
+          <div class="brand-badges">
+            <span class="house-badge">🏠 82 HARROW</span>
+            <span id="event-datetime-badge" class="datetime-badge">📅 December 2026 • 7:00 PM</span>
+            <span class="sync-badge" title="Updates automatically across all housemates' devices">
+              <span class="sync-dot"></span> Live Sync
+            </span>
+          </div>
+          <h1 id="header-event-title">82 Harrow Christmas Dinner 🎄</h1>
+          <p id="header-announcement" class="announcement-text"></p>
+        </div>
+
+        <div class="user-cluster">
+          <div class="current-user-card">
+            <div id="current-user-avatar" class="avatar">M</div>
+            <div class="current-user-info">
+              <div class="current-user-name-row">
+                <span id="current-user-name">Morgan</span>
+                <span id="current-user-role-badge" class="role-badge">Administrator</span>
+              </div>
+              <span id="current-user-username" class="current-user-handle">@morgan</span>
+            </div>
+          </div>
+          <button type="button" id="logout-btn" class="btn btn-outline-light btn-sm">Log Out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <!-- Stats Overview -->
+      <section class="stats-grid" aria-label="Menu statistics">
+        <div class="stat-card">
+          <span class="stat-label">Dinner Components</span>
+          <strong id="stat-total-dishes" class="stat-value">0</strong>
+          <span id="stat-total-spots" class="stat-sub">0 total spots</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Sorted So Far</span>
+          <strong id="stat-claimed-spots" class="stat-value text-green">0</strong>
+          <div class="progress-bar-track">
+            <div id="stat-progress-fill" class="progress-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Still Needs Sorting</span>
+          <strong id="stat-unclaimed-spots" class="stat-value text-gold">0</strong>
+          <span class="stat-sub">Waiting for someone</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Sorted By You</span>
+          <strong id="stat-my-claims" class="stat-value text-red">0</strong>
+          <span id="stat-housemates-count" class="stat-sub">0 people logged in</span>
+        </div>
+      </section>
+
+      <!-- Main View Navigation Tabs -->
+      <nav class="main-tabs" aria-label="Dashboard sections">
+        <button type="button" class="main-tab active" data-view="dishes">
+          🍽️ Christmas Dinner Dishes <span id="tab-count-dishes" class="tab-pill">0</span>
+        </button>
+        <button type="button" class="main-tab" data-view="housemates">
+          👥 People &amp; Privileges <span id="tab-count-housemates" class="tab-pill">0</span>
+        </button>
+        <button type="button" id="admin-settings-tab" class="main-tab hidden" data-view="admin">
+          ⚙️ Event Settings
+        </button>
+      </nav>
+
+      <!-- VIEW 1: DISHES & COMPONENTS LIST -->
+      <section id="view-dishes" class="view-section">
+        <!-- ADMIN OR DISH EDITOR: Add Custom Dish Panel -->
+        <div id="admin-add-dish-panel" class="admin-creator-card hidden">
+          <div class="creator-header">
+            <div>
+              <span id="creator-privilege-tag" class="admin-only-tag">👑 ADMINISTRATOR / DISH EDITOR</span>
+              <h2>Add Dishes to the Christmas Dinner Component List</h2>
+              <p>Add custom dishes or roles below. Housemates can then click <strong>"Assign to me"</strong> and attach a <strong>Recipe URL</strong>.</p>
+            </div>
+            <button type="button" id="toggle-presets-btn" class="btn btn-secondary btn-sm">
+              ✨ Quick-Add Christmas Ideas
+            </button>
+          </div>
+
+          <!-- Quick Add Chips (Collapsible) -->
+          <div id="quick-presets-drawer" class="presets-drawer hidden">
+            <p class="presets-hint">Tap any item below to instantly add it to the 82 Harrow dish list:</p>
+            <div id="presets-chips-container" class="presets-chips"></div>
+          </div>
+
+          <form id="add-dish-form" class="add-dish-form">
+            <div class="add-dish-grid">
+              <div class="form-group">
+                <label for="new-dish-title">Dish or Component Name *</label>
+                <input
+                  type="text"
+                  id="new-dish-title"
+                  required
+                  placeholder="e.g. Roast Turkey, Crispy Roast Potatoes, Pigs in Blankets, Gravy..."
+                />
+              </div>
+              <div class="form-group">
+                <label for="new-dish-category">Category</label>
+                <select id="new-dish-category">
+                  <option value="Mains">🦃 Mains</option>
+                  <option value="Sides & Trimmings" selected>🥔 Sides & Trimmings</option>
+                  <option value="Drinks">🍷 Drinks</option>
+                  <option value="Puddings & Desserts">🥧 Puddings & Desserts</option>
+                  <option value="Table & Setup">🎄 Table & Setup</option>
+                  <option value="Cleanup & Kitchen Roles">🧽 Cleanup & Kitchen Roles</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="new-dish-spots">People Needed</label>
+                <input type="number" id="new-dish-spots" min="1" max="20" value="1" required />
+              </div>
+            </div>
+            <div class="add-dish-bottom-row">
+              <div class="form-group flex-grow">
+                <input
+                  type="text"
+                  id="new-dish-notes"
+                  placeholder="Optional note (e.g. 'Enough for 8 people', 'Veggie friendly', 'Needs big roasting tin')"
+                />
+              </div>
+              <button type="submit" class="btn btn-primary">
+                + Add Dish to List
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Category & Status Filter Bar -->
+        <div class="filter-bar">
+          <div id="category-filters" class="filter-pills">
+            <button type="button" class="filter-pill active" data-filter="ALL">All Dishes</button>
+            <button type="button" class="filter-pill" data-filter="UNCLAIMED">🔥 Needs Sorting</button>
+            <button type="button" class="filter-pill" data-filter="MINE">⭐ Sorted by Me</button>
+            <button type="button" class="filter-pill" data-filter="Mains">🦃 Mains</button>
+            <button type="button" class="filter-pill" data-filter="Sides & Trimmings">🥔 Sides &amp; Trimmings</button>
+            <button type="button" class="filter-pill" data-filter="Drinks">🍷 Drinks</button>
+            <button type="button" class="filter-pill" data-filter="Puddings & Desserts">🥧 Desserts</button>
+            <button type="button" class="filter-pill" data-filter="Table & Setup">🎄 Table &amp; Setup</button>
+            <button type="button" class="filter-pill" data-filter="Cleanup & Kitchen Roles">🧽 Cleanup &amp; Roles</button>
+          </div>
+          <div class="search-box">
+            <input type="search" id="dish-search-input" placeholder="Search dishes or people..." />
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="dishes-empty-state" class="empty-state hidden">
+          <div class="empty-icon">🍽️</div>
+          <h3 id="empty-state-title">No dishes added to the list yet</h3>
+          <p id="empty-state-desc">Add the first Christmas dinner components above!</p>
+        </div>
+
+        <!-- Expandable Dishes List Container -->
+        <div id="dishes-container" class="dishes-list"></div>
+      </section>
+
+      <!-- VIEW 2: PEOPLE & PRIVILEGES (WITH SUBTABS) -->
+      <section id="view-housemates" class="view-section hidden">
+        <!-- Subtabs inside People & Privileges -->
+        <div class="subtabs-bar">
+          <button type="button" id="subtab-btn-privileges" class="subtab-btn active" data-subtab="privileges">
+            👑 People &amp; Privileges (Admin &amp; Dish Editors)
+          </button>
+          <button type="button" id="subtab-btn-roster" class="subtab-btn" data-subtab="roster">
+            🏠 Who's Sorting What (Dish Roster)
+          </button>
+        </div>
+
+        <!-- SUBTAB 1: PEOPLE & PRIVILEGES MANAGEMENT -->
+        <div id="subtab-privileges" class="subtab-panel">
+          <div class="section-intro">
+            <h2>👑 Logged-In People &amp; Privileges</h2>
+            <p id="privileges-subtitle">
+              See everyone who has logged into the 82 Harrow dashboard. As Administrator, you can grant anyone <strong>Dish Editor Privileges</strong> (so they can add dishes to the Christmas dinner component list) or full <strong>Administrator Privileges</strong>.
+            </p>
+          </div>
+          <div id="privileges-people-list" class="privileges-list"></div>
+        </div>
+
+        <!-- SUBTAB 2: WHO'S SORTING WHAT ROSTER -->
+        <div id="subtab-roster" class="subtab-panel hidden">
+          <div class="section-intro">
+            <h2>🏠 Who's Sorting What at 82 Harrow</h2>
+            <p>See every housemate and the Christmas dinner dishes they've assigned to themselves.</p>
+          </div>
+          <div id="housemates-grid" class="housemates-grid"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: EVENT SETTINGS (ADMIN ONLY) -->
+      <section id="view-admin" class="view-section hidden">
+        <div class="settings-card" style="max-width: 680px;">
+          <h3>🎄 Event Details &amp; House Notice</h3>
+          <p class="settings-desc">Update the banner info shown at the top of everyone's dashboard.</p>
+          <form id="settings-form">
+            <div class="form-group">
+              <label for="set-event-title">Dashboard Title</label>
+              <input type="text" id="set-event-title" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="set-event-date">Dinner Date</label>
+                <input type="text" id="set-event-date" placeholder="e.g. Wednesday 16th Dec" />
+              </div>
+              <div class="form-group">
+                <label for="set-event-time">Serving Time</label>
+                <input type="text" id="set-event-time" placeholder="e.g. 7:00 PM" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="set-announcement">House Announcement / Notice</label>
+              <textarea id="set-announcement" rows="3" placeholder="Announcement for 82 Harrow housemates..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="set-house-code">Optional House Signup Code (leave blank so housemates can sign up freely)</label>
+              <input type="text" id="set-house-code" placeholder="Leave empty for no signup code" />
+            </div>
+            <div class="form-group checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="set-lock-claims" />
+                <span>🔒 Lock dish assignments (prevent housemates from changing assignments)</span>
+              </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Event Settings</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

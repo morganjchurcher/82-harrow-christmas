@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: 82-harrow-christmas
+    runtime: python
+    buildCommand: "echo 'Build complete (stdlib only)'"
+    startCommand: "python3 app.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
