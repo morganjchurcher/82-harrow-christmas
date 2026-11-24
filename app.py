@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 82 Harrow Christmas Dinner Organisation Dashboard
-All-in-one Web Server + SQLite Database + Recipe URL Scraper
+All-in-one Web Server + SQLite Database + Recipe URL Scraper + 7-Person Cost Estimator + Meat Poll + Drinks Board
 Run locally: python3 app.py
 """
 
@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import html
 import json
+import math
 import os
 import re
 import secrets
@@ -32,6 +33,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 DATA_DIR = os.environ.get("DATA_DIR", BASE_DIR)
 DB_PATH = os.path.join(DATA_DIR, "harrow82_christmas.db")
 PORT = int(os.environ.get("PORT", "8080"))
+HOUSE_SIZE = 7  # 82 Harrow dinner size for ingredient scaling & cost splitting
 
 DB_LOCK = threading.Lock()
 
@@ -45,6 +47,15 @@ AVATAR_COLORS = [
     "#16a085",  # Holly Leaf
     "#a93226",  # Cinnamon
 ]
+
+MEAT_POLL_OPTIONS = [
+    {"id": "gammon", "label": "Gammon", "emoji": "🍖", "color": "#d9534f"},
+    {"id": "beef", "label": "Roast Beef", "emoji": "🥩", "color": "#8b261d"},
+    {"id": "lamb", "label": "Roast Lamb", "emoji": "🐑", "color": "#2e8b57"},
+    {"id": "pork", "label": "Roast Pork (& Crackling)", "emoji": "🐖", "color": "#e67e22"},
+    {"id": "beef_wellington", "label": "Beef Wellington (Ambitious)", "emoji": "🥐", "color": "#8e44ad"},
+]
+VALID_MEAT_IDS = {m["id"] for m in MEAT_POLL_OPTIONS}
 
 
 def get_db():
@@ -77,6 +88,35 @@ def is_morgan_user(username: str, display_name: str = "") -> bool:
     u = (username or "").strip().lower()
     d = (display_name or "").strip().lower()
     return u == "morgan" or d == "morgan" or u.startswith("morgan")
+
+
+def select_drink_emoji(name: str, notes: str = "") -> str:
+    """AI-style semantic emoji matcher for drinks uploaded by housemates."""
+    text = f"{name or ''} {notes or ''}".lower()
+    rules = [
+        (["mulled wine", "gluhwein", "glühwein", "red wine", "merlot", "malbec", "cabernet", "pinot noir", "shiraz", "rioja", "claret", "port", "bordeaux"], "🍷"),
+        (["prosecco", "champagne", "cava", "buck's fizz", "bucks fizz", "mimosa", "bellini", "sparkling wine", "bubbly", "fizz"], "🥂"),
+        (["white wine", "sauvignon", "chardonnay", "pinot grigio", "riesling", "rosé", "rose wine"], "🍾"),
+        (["guinness", "stout", "porter", "murphy"], "🍺"),
+        (["cider", "cidre", "kopparberg", "strongbow", "thatchers", "bulmers", "rekorderlig", "inch", "scrumpy"], "🍻"),
+        (["beer", "lager", "ale", "ipa", "pilsner", "stella", "peroni", "corona", "heineken", "birra", "moretti", "carling", "fosters", "kronenbourg", "madri", "asahi", "guinness", "craft beer", "pint"], "🍺"),
+        (["baileys", "irish cream", "whisky", "whiskey", "scotch", "bourbon", "jack daniel", "jameson", "brandy", "cognac", "hennessy", "amaretto", "disaronno", "kahlua", "tia maria", "southern comfort"], "🥃"),
+        (["tequila", "sambuca", "jager", "jäger", "fireball", "shot", "shots", "limoncello", "schnapps", "sourz"], "🥃"),
+        (["rum", "captain morgan", "malibu", "kraken", "bacardi", "spiced rum", "dark rum"], "🍹"),
+        (["gin", "g&t", "g & t", "martini", "espresso martini", "negroni", "cosmopolitan", "vodka", "smirnoff", "absolut", "grey goose"], "🍸"),
+        (["cocktail", "aperol", "spritz", "pimm", "mojito", "margarita", "daiquiri", "pina colada", "piña colada", "sangria", "punch", "sex on the beach", "bellini", "passionfruit"], "🍹"),
+        (["hot chocolate", "cocoa", "coffee", "tea", "latte", "mocha", "chai", "mulled apple", "hot toddy"], "☕"),
+        (["eggnog", "milk", "milkshake", "white russian", "horlicks"], "🥛"),
+        (["coke", "coca-cola", "coca cola", "diet coke", "pepsi", "lemonade", "sprite", "7up", "fanta", "tango", "irn-bru", "irn bru", "dr pepper", "ginger beer", "ginger ale", "soda", "soft drink", "fizzy"], "🥤"),
+        (["juice", "orange juice", "apple juice", "cranberry", "elderflower", "shloer", "appletiser", "j2o", "oasis", "ribena", "vimto", "cordial", "squash", "mocktail", "non-alcoholic", "0%", "alcohol free"], "🧃"),
+        (["water", "sparkling water", "san pellegrino", "evian", "tap water"], "💧"),
+    ]
+    for keywords, emoji in rules:
+        if any(k in text for k in keywords):
+            return emoji
+    if "wine" in text:
+        return "🍷"
+    return "🍹"
 
 
 def init_db():
@@ -122,6 +162,8 @@ def init_db():
                     recipe_ingredients TEXT NOT NULL DEFAULT '[]',
                     recipe_image TEXT NOT NULL DEFAULT '',
                     recipe_added_by TEXT NOT NULL DEFAULT '',
+                    recipe_servings INTEGER NOT NULL DEFAULT 4,
+                    recipe_custom_items TEXT NOT NULL DEFAULT '[]',
                     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
                 );
 
@@ -135,6 +177,32 @@ def init_db():
                     UNIQUE(dish_id, user_id),
                     FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS meat_votes (
+                    user_id INTEGER PRIMARY KEY,
+                    choice TEXT NOT NULL,
+                    voted_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS drinks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    emoji TEXT NOT NULL DEFAULT '🍹',
+                    notes TEXT NOT NULL DEFAULT '',
+                    created_by INTEGER,
+                    created_by_name TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS drink_selections (
+                    user_id INTEGER PRIMARY KEY,
+                    drink_id INTEGER NOT NULL,
+                    selected_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (drink_id) REFERENCES drinks(id) ON DELETE CASCADE
                 );
 
                 CREATE TABLE IF NOT EXISTS settings (
@@ -165,6 +233,8 @@ def init_db():
                 ("recipe_ingredients", "TEXT NOT NULL DEFAULT '[]'"),
                 ("recipe_image", "TEXT NOT NULL DEFAULT ''"),
                 ("recipe_added_by", "TEXT NOT NULL DEFAULT ''"),
+                ("recipe_servings", "INTEGER NOT NULL DEFAULT 4"),
+                ("recipe_custom_items", "TEXT NOT NULL DEFAULT '[]'"),
             ]
             for col_name, col_def in recipe_migrations:
                 if col_name not in dish_cols:
@@ -184,7 +254,7 @@ def init_db():
                 "event_title": "82 Harrow Christmas Dinner",
                 "event_date": "December 2026",
                 "event_time": "7:00 PM",
-                "announcement": "Welcome to the 82 Harrow Christmas Dinner dashboard! Click 'Assign to me' on any dish to claim it, or expand a dish to add and view its recipe.",
+                "announcement": "Welcome to the 82 Harrow Christmas Dinner dashboard! Assign dishes to yourself, add Recipe URLs, vote in the Secondary Meat Poll, and pick your Drinks!",
                 "house_code": "",
                 "lock_claims": "false",
             }
@@ -199,8 +269,27 @@ def init_db():
 
 
 # =====================================================================
-# RECIPE URL SCRAPER & PARSER
+# RECIPE URL SCRAPER & 7-PERSON UK SUPERMARKET COST ESTIMATOR
 # =====================================================================
+
+UNICODE_FRACTIONS = {
+    "½": 0.5,
+    "⅓": 1 / 3,
+    "⅔": 2 / 3,
+    "¼": 0.25,
+    "¾": 0.75,
+    "⅕": 0.2,
+    "⅖": 0.4,
+    "⅗": 0.6,
+    "⅘": 0.8,
+    "⅙": 1 / 6,
+    "⅚": 5 / 6,
+    "⅛": 0.125,
+    "⅜": 0.375,
+    "⅝": 0.625,
+    "⅞": 0.875,
+}
+
 
 def clean_text(val: str) -> str:
     if not val:
@@ -211,8 +300,30 @@ def clean_text(val: str) -> str:
     return text
 
 
+def parse_servings(val) -> int:
+    """Extract numeric serving count from Schema.org recipeYield or string."""
+    if not val:
+        return 4
+    if isinstance(val, (int, float)):
+        n = int(val)
+        return max(1, min(30, n)) if n > 0 else 4
+    if isinstance(val, list) and val:
+        return parse_servings(val[0])
+    s = clean_text(str(val))
+    # Look for "serves X" or "X servings" or "X-Y"
+    m_range = re.search(r"(\d+)\s*(?:-|to|–)\s*(\d+)", s, re.IGNORECASE)
+    if m_range:
+        avg = round((int(m_range.group(1)) + int(m_range.group(2))) / 2)
+        return max(1, min(30, avg))
+    m_single = re.search(r"(\d+)", s)
+    if m_single:
+        n = int(m_single.group(1))
+        if 1 <= n <= 30:
+            return n
+    return 4
+
+
 def format_iso_duration(val) -> str:
-    """Convert ISO 8601 duration (e.g. PT25M, PT1H30M) or raw text to human-friendly time."""
     if not val:
         return ""
     if isinstance(val, (int, float)):
@@ -242,8 +353,258 @@ def format_iso_duration(val) -> str:
     return s
 
 
+def parse_number_token(tok: str) -> float:
+    tok = tok.strip()
+    if not tok:
+        return 0.0
+    for uf, fval in UNICODE_FRACTIONS.items():
+        if uf in tok:
+            prefix = tok.replace(uf, "").strip()
+            base = float(prefix) if prefix.isdigit() else 0.0
+            return base + fval
+    if "/" in tok:
+        parts = tok.split("/", 1)
+        try:
+            return float(parts[0]) / float(parts[1])
+        except Exception:
+            return 0.0
+    try:
+        return float(tok)
+    except Exception:
+        return 0.0
+
+
+def scale_ingredient_for_7(raw_ing: str, base_servings: int = 4) -> dict:
+    """
+    Scale a recipe ingredient line from base_servings to HOUSE_SIZE (7 people)
+    and estimate its average UK supermarket cost in GBP (£).
+    """
+    ing = clean_text(raw_ing)
+    base_servings = max(1, int(base_servings or 4))
+    factor = HOUSE_SIZE / float(base_servings)
+
+    # Replace unicode fractions with spaced versions for easier regex matching
+    norm = ing
+    for uf in UNICODE_FRACTIONS:
+        norm = norm.replace(uf, f" {uf}")
+    norm = re.sub(r"\s+", " ", norm).strip()
+
+    # Match leading number (e.g. "2.5", "1 1/2", "100", "2-3") + optional unit
+    pattern = re.compile(
+        r"^(\d+(?:\.\d+)?(?:\s+\d+/\d+|\s+[½⅓⅔¼¾⅛⅜⅝⅞])?|\d+/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])"
+        r"(?:\s*(?:-|to|–)\s*(\d+(?:\.\d+)?))?"
+        r"\s*(kg|g|grams?|ml|l|litres?|tbsp|tablespoons?|tsp|teaspoons?|oz|lb|cloves?|cans?|tins?|packs?|packets?|bunche?s?|sprigs?|slices?|rashers?|sheets?)?\b\s*(.*)$",
+        re.IGNORECASE,
+    )
+    m = pattern.match(norm)
+
+    qty_val = None
+    unit = ""
+    rest_name = ing
+
+    if m:
+        q1_str = m.group(1)
+        q2_str = m.group(2)
+        unit_raw = (m.group(3) or "").lower()
+        remainder = (m.group(4) or "").strip()
+
+        # Parse q1 (could be "1 1/2")
+        subparts = q1_str.split()
+        q1 = sum(parse_number_token(sp) for sp in subparts)
+        if q2_str:
+            q2 = parse_number_token(q2_str)
+            if q2 > q1:
+                q1 = (q1 + q2) / 2.0
+
+        if q1 > 0:
+            qty_val = q1
+            unit = unit_raw
+            rest_name = remainder if remainder else ing
+
+    # Compute scaled amount string for 7 people
+    scaled_qty = (qty_val * factor) if qty_val is not None else None
+    amount_for_7 = ""
+
+    if scaled_qty is not None:
+        if unit in ("g", "gram", "grams"):
+            if scaled_qty >= 1000:
+                kg_val = round(scaled_qty / 1000.0, 2)
+                amount_for_7 = f"{kg_val:g} kg"
+            else:
+                rounded_g = max(5, int(round(scaled_qty / 5.0) * 5))
+                amount_for_7 = f"{rounded_g} g"
+        elif unit == "kg":
+            kg_val = round(scaled_qty, 2)
+            amount_for_7 = f"{kg_val:g} kg"
+        elif unit == "ml":
+            if scaled_qty >= 1000:
+                l_val = round(scaled_qty / 1000.0, 2)
+                amount_for_7 = f"{l_val:g} L"
+            else:
+                rounded_ml = max(5, int(round(scaled_qty / 5.0) * 5))
+                amount_for_7 = f"{rounded_ml} ml"
+        elif unit in ("l", "litre", "litres"):
+            l_val = round(scaled_qty, 2)
+            amount_for_7 = f"{l_val:g} L"
+        elif unit in ("tbsp", "tablespoon", "tablespoons"):
+            rounded_t = round(scaled_qty * 2) / 2.0
+            amount_for_7 = f"{rounded_t:g} tbsp"
+        elif unit in ("tsp", "teaspoon", "teaspoons"):
+            rounded_t = round(scaled_qty * 2) / 2.0
+            amount_for_7 = f"{rounded_t:g} tsp"
+        elif unit:
+            # Discrete units like cloves, packs, sprigs, slices
+            rounded_u = max(1, int(math.ceil(scaled_qty - 0.15)))
+            amount_for_7 = f"{rounded_u} {unit}"
+        else:
+            # Count of whole items (e.g. "2 onions", "12 chipolatas")
+            rounded_cnt = max(1, int(math.ceil(scaled_qty - 0.15)))
+            amount_for_7 = f"{rounded_cnt}"
+    else:
+        amount_for_7 = f"Scaled for {HOUSE_SIZE} (1x pack/to taste)"
+
+    est_cost = estimate_uk_supermarket_cost(ing, scaled_qty, unit)
+
+    return {
+        "ingredient": rest_name.lstrip("- ").strip() or ing,
+        "original_text": ing,
+        "amount_for_7": amount_for_7,
+        "estimated_cost_gbp": round(est_cost, 2),
+    }
+
+
+def estimate_uk_supermarket_cost(ing_text: str, scaled_qty: float, unit: str) -> float:
+    """
+    Estimate typical UK supermarket cost (Tesco / Sainsbury's / Aldi average in £ GBP)
+    for the scaled 7-person quantity.
+    """
+    t = ing_text.lower()
+    u = (unit or "").lower()
+
+    # Convert weight to grams or volume to ml if available
+    grams = None
+    if scaled_qty is not None:
+        if u in ("g", "gram", "grams"):
+            grams = scaled_qty
+        elif u == "kg":
+            grams = scaled_qty * 1000.0
+        elif u == "oz":
+            grams = scaled_qty * 28.35
+        elif u == "lb":
+            grams = scaled_qty * 453.6
+
+    ml = None
+    if scaled_qty is not None:
+        if u == "ml":
+            ml = scaled_qty
+        elif u in ("l", "litre", "litres"):
+            ml = scaled_qty * 1000.0
+
+    # Small pinch / spoonful pantry items (salt, pepper, oil, vinegar, spices, flour)
+    if u in ("tsp", "teaspoon", "teaspoons", "tbsp", "tablespoon", "tablespoons") or "to taste" in t or "pinch" in t:
+        if any(k in t for k in ["goose fat", "duck fat"]):
+            return 3.25
+        if any(k in t for k in ["truffle", "saffron", "vanilla", "maple syrup", "honey", "cranberry", "redcurrant"]):
+            return 1.85
+        if any(k in t for k in ["butter", "olive oil", "vegetable oil", "sunflower oil", "rapeseed oil"]):
+            return 0.65
+        if any(k in t for k in ["salt", "pepper", "flour", "sugar", "mustard", "vinegar", "soy", "worcestershire", "paprika", "cinnamon", "nutmeg", "thyme", "rosemary", "sage", "bay", "mixed herbs"]):
+            return 0.45
+        return 0.60
+
+    # 1. Poultry & Meats
+    if "turkey" in t:
+        if "crown" in t or (grams and grams < 3000):
+            return 19.50
+        return 26.00
+    if "beef wellington" in t or "fillet of beef" in t or "beef fillet" in t or "tenderloin" in t:
+        return 28.00 if not grams else max(16.00, round((grams / 1000.0) * 32.0, 2))
+    if "chicken" in t and not any(k in t for k in ["stock", "bouillon", "gravy", "cube"]):
+        if "whole" in t or (grams and grams >= 1400):
+            return 6.75 * max(1, round((grams or 2200) / 1800.0))
+        return 5.50
+    if "gammon" in t or "ham" in t:
+        if "slice" in t or "parma" in t or "prosciutto" in t:
+            return 2.60
+        return 9.50 if not grams else max(6.50, round((grams / 1000.0) * 6.50, 2))
+    if "beef" in t and not any(k in t for k in ["stock", "bouillon", "gravy", "cube", "suet"]):
+        return 13.50 if not grams else max(7.50, round((grams / 1000.0) * 11.50, 2))
+    if "lamb" in t and not any(k in t for k in ["stock"]):
+        return 14.50 if not grams else max(8.50, round((grams / 1000.0) * 12.50, 2))
+    if "pork" in t and not any(k in t for k in ["stock"]):
+        if "sausage" in t or "mince" in t or " sausagemeat" in t:
+            return 3.00
+        return 9.00 if not grams else max(5.50, round((grams / 1000.0) * 7.50, 2))
+    if any(k in t for k in ["pigs in blankets", "chipolata", "sausage"]):
+        packs = 2 if (scaled_qty and scaled_qty >= 12) else 1
+        return round(2.75 * packs, 2)
+    if any(k in t for k in ["bacon", "pancetta", "lardons", "streaky"]):
+        packs = 2 if (grams and grams > 300) or (scaled_qty and u in ("rasher", "rashers", "slice", "slices") and scaled_qty > 10) else 1
+        return round(2.40 * packs, 2)
+
+    # 2. Fats, Dairy, Eggs & Cheese
+    if any(k in t for k in ["goose fat", "duck fat"]):
+        return 3.50
+    if "butter" in t:
+        return 2.15 if not grams or grams <= 250 else round(2.15 * math.ceil(grams / 250.0), 2)
+    if any(k in t for k in ["double cream", "single cream", "whipping cream", "clotted cream", "creme fraiche", "crème fraîche", "custard"]):
+        return 1.65 if not ml or ml <= 300 else 2.65
+    if any(k in t for k in ["cheddar", "cheese", "parmesan", "gruyere", "stilton", "camembert", "brie"]):
+        return 2.85 if not grams or grams <= 300 else round((grams / 250.0) * 2.50, 2)
+    if "milk" in t:
+        return 1.45
+    if "egg" in t:
+        return 2.10
+    if "pastry" in t or "puff pastry" in t or "shortcrust" in t:
+        return 1.85
+
+    # 3. Christmas Veg & Produce
+    if "potato" in t:
+        if grams:
+            return max(1.50, round((grams / 2000.0) * 1.85, 2))
+        return 2.00
+    if "parsnip" in t:
+        return 1.30 if not grams or grams <= 750 else 2.20
+    if "carrot" in t:
+        return 0.95 if not grams or grams <= 1000 else 1.60
+    if "sprout" in t:
+        return 1.40 if not grams or grams <= 750 else 2.40
+    if "cauliflower" in t:
+        return 1.35 if not scaled_qty or scaled_qty <= 1.2 else round(1.35 * math.ceil(scaled_qty), 2)
+    if any(k in t for k in ["cabbage", "red cabbage", "broccoli", "leek", "peas", "green beans"]):
+        return 1.40
+    if "mushroom" in t:
+        return 1.65
+    if "chestnut" in t:
+        return 2.50
+    if any(k in t for k in ["onion", "shallot"]):
+        return 1.10
+    if "garlic" in t:
+        return 0.75
+    if any(k in t for k in ["lemon", "orange", "clementine", "apple", "cranberr"]):
+        return 1.50
+    if any(k in t for k in ["rosemary", "thyme", "sage", "parsley", "bay leaves", "fresh herbs", "chives"]):
+        return 1.00
+
+    # 4. Liquids, Wine, Stock, Gravy & Condiments
+    if any(k in t for k in ["wine", "port", "sherry", "brandy", "cider", "marsala"]):
+        if ml and ml <= 250:
+            return 2.75  # Cooking portion of a £6.50 bottle
+        return 6.50
+    if any(k in t for k in ["stock", "bouillon", "gravy", "bisto"]):
+        return 1.35
+    if any(k in t for k in ["cranberry sauce", "bread sauce", "horseradish", "mustard", "apple sauce", "mint sauce", "redcurrant jelly"]):
+        return 1.60
+    if "stuffing" in t:
+        return 1.75
+    if any(k in t for k in ["breadcrumb", "bread", "flour", "cornflour", "sugar", "icing sugar", "brown sugar", "honey"]):
+        return 1.15
+
+    # Default average UK grocery item
+    return 1.50
+
+
 def find_recipe_node(data):
-    """Recursively search JSON-LD or Next.js JSON for a Schema.org Recipe object."""
     if isinstance(data, list):
         for item in data:
             found = find_recipe_node(item)
@@ -262,13 +623,11 @@ def find_recipe_node(data):
         if is_recipe:
             return data
 
-        # Check @graph first
         if "@graph" in data:
             found = find_recipe_node(data["@graph"])
             if found:
                 return found
 
-        # Heuristic: dict has recipeIngredient
         if "recipeIngredient" in data and isinstance(data["recipeIngredient"], list):
             return data
 
@@ -342,6 +701,7 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
     cook_time = ""
     ingredients = []
     recipe_image = ""
+    recipe_servings = 4
 
     # 1. Search all JSON-LD <script type="application/ld+json"> blocks
     ld_blocks = re.findall(
@@ -356,7 +716,6 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
         try:
             data = json.loads(cleaned_block)
         except Exception:
-            # Sometimes JSON-LD contains raw control chars
             try:
                 data = json.loads(re.sub(r"[\x00-\x1f]+", " ", cleaned_block))
             except Exception:
@@ -369,6 +728,8 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
             prep_time = format_iso_duration(node.get("prepTime"))
             cook_time = format_iso_duration(node.get("cookTime") or node.get("totalTime"))
             recipe_image = extract_image_url(node.get("image"))
+            if node.get("recipeYield"):
+                recipe_servings = parse_servings(node.get("recipeYield"))
 
             raw_ings = node.get("recipeIngredient") or node.get("ingredients") or []
             if isinstance(raw_ings, str):
@@ -402,6 +763,8 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
                     recipe_description = recipe_description or clean_text(node.get("description") or "")
                     prep_time = prep_time or format_iso_duration(node.get("prepTime"))
                     cook_time = cook_time or format_iso_duration(node.get("cookTime") or node.get("totalTime"))
+                    if node.get("recipeYield"):
+                        recipe_servings = parse_servings(node.get("recipeYield"))
                     raw_ings = node.get("recipeIngredient") or node.get("ingredients") or []
                     if isinstance(raw_ings, list):
                         for item in raw_ings:
@@ -454,7 +817,6 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
         if og_img:
             recipe_image = og_img.group(1).strip()
 
-    # Fallback HTML microdata ingredients
     if not ingredients:
         micro_ings = re.findall(
             r'itemprop=["\'](?:recipeIngredient|ingredients)["\'][^>]*>(.*?)</',
@@ -466,7 +828,6 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
             if c and len(c) < 220:
                 ingredients.append(c)
 
-    # Fallback class-based ingredients
     if not ingredients:
         li_ings = re.findall(
             r'<li[^>]*class=["\'][^"\']*ingredient[^"\']*["\'][^>]*>(.*?)</li>',
@@ -478,7 +839,6 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
             if c and len(c) < 220:
                 ingredients.append(c)
 
-    # Fallback regex for Prep Time & Cook Time in plain text
     plain_text = clean_text(page_html)
     if not prep_time:
         pm = re.search(
@@ -498,7 +858,11 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
         if cm:
             cook_time = cm.group(1).strip()
 
-    # Deduplicate ingredients while preserving order
+    if recipe_servings == 4:
+        sm = re.search(r"Serves\s*[:\-]?\s*(\d+(?:\s*(?:-|to|–)\s*\d+)?)", plain_text, re.IGNORECASE)
+        if sm:
+            recipe_servings = parse_servings(sm.group(1))
+
     seen = set()
     deduped_ings = []
     for ing in ingredients:
@@ -506,6 +870,8 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
         if key not in seen:
             seen.add(key)
             deduped_ings.append(ing)
+
+    scaled_items = [scale_ingredient_for_7(ing, recipe_servings) for ing in deduped_ings]
 
     return {
         "recipe_url": url,
@@ -515,6 +881,8 @@ def scrape_recipe_from_url(url: str, raw_html: str = None) -> dict:
         "recipe_cook_time": cook_time or "Not listed",
         "recipe_ingredients": deduped_ings,
         "recipe_image": recipe_image,
+        "recipe_servings": recipe_servings,
+        "recipe_custom_items": scaled_items,
     }
 
 
@@ -545,7 +913,7 @@ def fetch_dashboard_state(conn, current_user=None):
         """
         SELECT id, title, category, notes, max_claims, sort_order, created_by, created_at,
                recipe_url, recipe_title, recipe_description, recipe_prep_time, recipe_cook_time,
-               recipe_ingredients, recipe_image, recipe_added_by
+               recipe_ingredients, recipe_image, recipe_added_by, recipe_servings, recipe_custom_items
         FROM dishes
         ORDER BY sort_order ASC, id ASC
         """
@@ -573,10 +941,65 @@ def fetch_dashboard_state(conn, current_user=None):
             dd["recipe_ingredients"] = json.loads(dd.get("recipe_ingredients") or "[]")
         except Exception:
             dd["recipe_ingredients"] = []
+
+        servings = int(dd.get("recipe_servings") or 4)
+        dd["recipe_servings"] = servings
+
+        try:
+            custom_items = json.loads(dd.get("recipe_custom_items") or "[]")
+        except Exception:
+            custom_items = []
+
+        # If custom_items haven't been computed yet for existing recipe_ingredients, compute them on the fly!
+        if not custom_items and dd["recipe_ingredients"]:
+            custom_items = [scale_ingredient_for_7(ing, servings) for ing in dd["recipe_ingredients"]]
+
+        dd["compiled_ingredients"] = custom_items
         dd["claims"] = claims_by_dish.get(dd["id"], [])
         dishes.append(dd)
 
+    # Meat Poll Votes
+    meat_votes_rows = conn.execute(
+        """
+        SELECT mv.user_id, mv.choice, mv.voted_at,
+               u.display_name, u.username, u.avatar_color
+        FROM meat_votes mv
+        JOIN users u ON u.id = mv.user_id
+        ORDER BY mv.voted_at ASC
+        """
+    ).fetchall()
+    meat_votes = [dict(r) for r in meat_votes_rows]
+
+    # Drinks & Selections
+    drinks_rows = conn.execute(
+        """
+        SELECT id, name, emoji, notes, created_by, created_by_name, created_at
+        FROM drinks
+        ORDER BY id ASC
+        """
+    ).fetchall()
+    drink_sel_rows = conn.execute(
+        """
+        SELECT ds.user_id, ds.drink_id, ds.selected_at,
+               u.display_name, u.username, u.avatar_color
+        FROM drink_selections ds
+        JOIN users u ON u.id = ds.user_id
+        ORDER BY ds.selected_at ASC
+        """
+    ).fetchall()
+    drinkers_by_drink = {}
+    for s in drink_sel_rows:
+        sd = dict(s)
+        drinkers_by_drink.setdefault(sd["drink_id"], []).append(sd)
+
+    drinks = []
+    for dr in drinks_rows:
+        drd = dict(dr)
+        drd["drinkers"] = drinkers_by_drink.get(drd["id"], [])
+        drinks.append(drd)
+
     return {
+        "house_size": HOUSE_SIZE,
         "has_admin": any(u["role"] == "admin" for u in users),
         "user_count": len(users),
         "require_house_code": bool(settings.get("house_code", "").strip()),
@@ -594,6 +1017,12 @@ def fetch_dashboard_state(conn, current_user=None):
         },
         "users": users if current_user else [],
         "dishes": dishes if current_user else [],
+        "meat_poll": {
+            "primary_meat": {"label": "Roast Chicken", "emoji": "🍗", "note": "Non-Negotiable Centrepiece"},
+            "options": MEAT_POLL_OPTIONS,
+            "votes": meat_votes if current_user else [],
+        },
+        "drinks": drinks if current_user else [],
     }
 
 
@@ -741,7 +1170,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         return self.send_json(400, {"error": "Password must be at least 4 characters."})
 
                     existing_count = conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()["cnt"]
-                    # Morgan (or the first user) automatically gets Administrator + Dish Editor privileges
                     is_admin = (existing_count == 0) or is_morgan_user(username, display_name)
                     role = "admin" if is_admin else "housemate"
                     can_edit_dishes = 1 if is_admin else 0
@@ -803,7 +1231,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
                     row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
 
-                    # Convenience: if Morgan logs in directly before registering, create Morgan's Admin account on the spot!
                     if not row and is_morgan_user(username) and len(password) >= 4:
                         pwd_hash, salt = hash_password(password)
                         now_iso = datetime.utcnow().isoformat()
@@ -824,7 +1251,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         return self.send_json(401, {"error": "Incorrect username or password."})
 
                     now_iso = datetime.utcnow().isoformat()
-                    # Ensure Morgan always has admin privileges
                     if is_morgan_user(row["username"], row["display_name"]) and row["role"] != "admin":
                         conn.execute(
                             "UPDATE users SET role = 'admin', can_edit_dishes = 1, last_login_at = ? WHERE id = ?",
@@ -863,9 +1289,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 if not user:
                     return self.send_json(401, {"error": "Please log in first."})
 
-                can_manage_dishes = (user["role"] == "admin") or bool(user.get("can_edit_dishes"))
+                is_admin = user["role"] == "admin"
+                can_manage_dishes = is_admin or bool(user.get("can_edit_dishes"))
 
-                # 4. ADD DISH / ROLE (ADMIN OR DISH EDITOR)
+                # 4. ADD DISH / ROLE
                 if path == "/api/dishes/add":
                     if not can_manage_dishes:
                         return self.send_json(
@@ -896,7 +1323,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
-                # 5. UPDATE DISH / ROLE (ADMIN OR DISH EDITOR)
+                # 5. UPDATE DISH / ROLE
                 if path == "/api/dishes/update":
                     if not can_manage_dishes:
                         return self.send_json(403, {"error": "You need Dish Editor or Administrator privileges to edit dishes."})
@@ -923,7 +1350,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
-                # 6. DELETE DISH / ROLE (ADMIN OR DISH EDITOR)
+                # 6. DELETE DISH / ROLE
                 if path == "/api/dishes/delete":
                     if not can_manage_dishes:
                         return self.send_json(403, {"error": "You need Dish Editor or Administrator privileges to delete dishes."})
@@ -932,7 +1359,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
-                # 7. ADD OR UPDATE RECIPE URL ON A DISH (ANY LOGGED-IN USER)
+                # 7. ADD OR UPDATE RECIPE URL ON A DISH
                 if path == "/api/dishes/recipe":
                     dish_id = data.get("dish_id")
                     recipe_url = (data.get("recipe_url") or "").strip()
@@ -943,13 +1370,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         return self.send_json(404, {"error": "Dish not found."})
 
                     if not recipe_url and not manual_override:
-                        # Clear recipe
                         conn.execute(
                             """
                             UPDATE dishes
                             SET recipe_url = '', recipe_title = '', recipe_description = '',
                                 recipe_prep_time = '', recipe_cook_time = '',
-                                recipe_ingredients = '[]', recipe_image = '', recipe_added_by = ''
+                                recipe_ingredients = '[]', recipe_image = '', recipe_added_by = '',
+                                recipe_servings = 4, recipe_custom_items = '[]'
                             WHERE id = ?
                             """,
                             (dish_id,),
@@ -962,6 +1389,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         r_desc = (data.get("recipe_description") or "").strip()
                         r_prep = (data.get("recipe_prep_time") or "Not listed").strip()
                         r_cook = (data.get("recipe_cook_time") or "Not listed").strip()
+                        try:
+                            r_servings = max(1, min(30, int(data.get("recipe_servings") or dish["recipe_servings"] or 4)))
+                        except Exception:
+                            r_servings = 4
                         raw_ings = data.get("recipe_ingredients") or []
                         if isinstance(raw_ings, str):
                             r_ings = [x.strip() for x in raw_ings.split("\n") if x.strip()]
@@ -970,6 +1401,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         else:
                             r_ings = []
                         r_image = (data.get("recipe_image") or dish["recipe_image"] or "").strip()
+                        r_custom_items = data.get("compiled_ingredients")
+                        if not isinstance(r_custom_items, list):
+                            r_custom_items = [scale_ingredient_for_7(ing, r_servings) for ing in r_ings]
                     else:
                         raw_html = data.get("raw_html") or None
                         try:
@@ -980,6 +1414,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             r_cook = scraped["recipe_cook_time"]
                             r_ings = scraped["recipe_ingredients"]
                             r_image = scraped["recipe_image"]
+                            r_servings = scraped["recipe_servings"]
+                            r_custom_items = scraped["recipe_custom_items"]
                         except Exception as exc:
                             return self.send_json(
                                 422,
@@ -995,7 +1431,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         UPDATE dishes
                         SET recipe_url = ?, recipe_title = ?, recipe_description = ?,
                             recipe_prep_time = ?, recipe_cook_time = ?,
-                            recipe_ingredients = ?, recipe_image = ?, recipe_added_by = ?
+                            recipe_ingredients = ?, recipe_image = ?, recipe_added_by = ?,
+                            recipe_servings = ?, recipe_custom_items = ?
                         WHERE id = ?
                         """,
                         (
@@ -1007,8 +1444,53 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             json.dumps(r_ings),
                             r_image,
                             user["display_name"],
+                            r_servings,
+                            json.dumps(r_custom_items),
                             dish_id,
                         ),
+                    )
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 7B. ADMIN UPDATE COMPILED 7-PERSON INGREDIENT AMOUNT OR COST
+                if path == "/api/recipes/update_item":
+                    if not is_admin:
+                        return self.send_json(403, {"error": "Only the Administrator can edit compiled ingredient amounts and costs."})
+                    dish_id = data.get("dish_id")
+                    item_index = int(data.get("item_index", -1))
+                    new_ingredient = (data.get("ingredient") or "").strip()
+                    new_amount = (data.get("amount_for_7") or "").strip()
+                    try:
+                        new_cost = max(0.0, round(float(data.get("estimated_cost_gbp", 0.0)), 2))
+                    except Exception:
+                        new_cost = 1.50
+
+                    dish = conn.execute("SELECT * FROM dishes WHERE id = ?", (dish_id,)).fetchone()
+                    if not dish:
+                        return self.send_json(404, {"error": "Dish not found."})
+
+                    try:
+                        ings = json.loads(dish["recipe_ingredients"] or "[]")
+                    except Exception:
+                        ings = []
+                    servings = int(dish["recipe_servings"] or 4)
+                    try:
+                        custom_items = json.loads(dish["recipe_custom_items"] or "[]")
+                    except Exception:
+                        custom_items = []
+                    if not custom_items and ings:
+                        custom_items = [scale_ingredient_for_7(ing, servings) for ing in ings]
+
+                    if 0 <= item_index < len(custom_items):
+                        if new_ingredient:
+                            custom_items[item_index]["ingredient"] = new_ingredient
+                        if new_amount:
+                            custom_items[item_index]["amount_for_7"] = new_amount
+                        custom_items[item_index]["estimated_cost_gbp"] = new_cost
+
+                    conn.execute(
+                        "UPDATE dishes SET recipe_custom_items = ? WHERE id = ?",
+                        (json.dumps(custom_items), dish_id),
                     )
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
@@ -1018,13 +1500,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     dish_id = data.get("dish_id")
                     target_user_id = (
                         data.get("user_id")
-                        if (user["role"] == "admin" and data.get("user_id"))
+                        if (is_admin and data.get("user_id"))
                         else user["id"]
                     )
                     note = (data.get("note") or "").strip()
 
                     lock_row = conn.execute("SELECT value FROM settings WHERE key = 'lock_claims'").fetchone()
-                    if lock_row and lock_row["value"] == "true" and user["role"] != "admin":
+                    if lock_row and lock_row["value"] == "true" and not is_admin:
                         return self.send_json(403, {"error": "Assignments have been locked by the organiser."})
 
                     dish = conn.execute("SELECT * FROM dishes WHERE id = ?", (dish_id,)).fetchone()
@@ -1062,12 +1544,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     dish_id = data.get("dish_id")
                     target_user_id = (
                         data.get("user_id")
-                        if (user["role"] == "admin" and data.get("user_id"))
+                        if (is_admin and data.get("user_id"))
                         else user["id"]
                     )
 
                     lock_row = conn.execute("SELECT value FROM settings WHERE key = 'lock_claims'").fetchone()
-                    if lock_row and lock_row["value"] == "true" and user["role"] != "admin":
+                    if lock_row and lock_row["value"] == "true" and not is_admin:
                         return self.send_json(403, {"error": "Assignments are locked by the organiser."})
 
                     conn.execute(
@@ -1086,7 +1568,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     claim = conn.execute("SELECT * FROM claims WHERE id = ?", (claim_id,)).fetchone()
                     if not claim:
                         return self.send_json(404, {"error": "Assignment not found."})
-                    if claim["user_id"] != user["id"] and user["role"] != "admin":
+                    if claim["user_id"] != user["id"] and not is_admin:
                         return self.send_json(403, {"error": "You can only edit your own assignment."})
 
                     new_note = claim["note"] if note is None else str(note).strip()
@@ -1101,9 +1583,113 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
-                # 11. UPDATE SETTINGS (ADMIN ONLY)
+                # 11. MEAT POLL VOTE (EVERYONE CAN VOTE; ADMIN CAN ALSO EDIT ANYONE'S VOTE)
+                if path == "/api/meat_poll/vote":
+                    choice = (data.get("choice") or "").strip().lower()
+                    target_user_id = (
+                        int(data.get("user_id"))
+                        if (is_admin and data.get("user_id"))
+                        else user["id"]
+                    )
+                    if choice == "clear" or choice == "":
+                        conn.execute("DELETE FROM meat_votes WHERE user_id = ?", (target_user_id,))
+                        conn.commit()
+                        return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                    if choice not in VALID_MEAT_IDS:
+                        return self.send_json(400, {"error": "Invalid secondary meat option."})
+
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO meat_votes (user_id, choice, voted_at)
+                        VALUES (?, ?, ?)
+                        """,
+                        (target_user_id, choice, datetime.utcnow().isoformat()),
+                    )
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 12. DRINKS: ADD DRINK OPTION (EVERYONE CAN UPLOAD DRINK OPTIONS)
+                if path == "/api/drinks/add":
+                    name = (data.get("name") or "").strip()
+                    notes = (data.get("notes") or "").strip()
+                    if not name:
+                        return self.send_json(400, {"error": "Please enter a drink name."})
+
+                    emoji = select_drink_emoji(name, notes)
+                    conn.execute(
+                        """
+                        INSERT INTO drinks (name, emoji, notes, created_by, created_by_name, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (name, emoji, notes, user["id"], user["display_name"], datetime.utcnow().isoformat()),
+                    )
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 13. DRINKS: SELECT / SWITCH ONE DRINK OPTION (OR ADMIN ASSIGN)
+                if path == "/api/drinks/select":
+                    drink_id = data.get("drink_id")
+                    target_user_id = (
+                        int(data.get("user_id"))
+                        if (is_admin and data.get("user_id"))
+                        else user["id"]
+                    )
+                    if not drink_id or drink_id == "clear":
+                        conn.execute("DELETE FROM drink_selections WHERE user_id = ?", (target_user_id,))
+                        conn.commit()
+                        return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                    drink_row = conn.execute("SELECT id FROM drinks WHERE id = ?", (drink_id,)).fetchone()
+                    if not drink_row:
+                        return self.send_json(404, {"error": "Drink option not found."})
+
+                    # Each person gets ONE drink selection (INSERT OR REPLACE switches their choice automatically)
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO drink_selections (user_id, drink_id, selected_at)
+                        VALUES (?, ?, ?)
+                        """,
+                        (target_user_id, int(drink_id), datetime.utcnow().isoformat()),
+                    )
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 14. DRINKS: EDIT OR DELETE DRINK OPTION (ADMIN OR CREATOR)
+                if path == "/api/drinks/update":
+                    drink_id = data.get("drink_id")
+                    dr = conn.execute("SELECT * FROM drinks WHERE id = ?", (drink_id,)).fetchone()
+                    if not dr:
+                        return self.send_json(404, {"error": "Drink not found."})
+                    if not is_admin and dr["created_by"] != user["id"]:
+                        return self.send_json(403, {"error": "Only the Administrator or creator can edit this drink."})
+
+                    name = (data.get("name") or "").strip()
+                    notes = (data.get("notes") or "").strip()
+                    if not name:
+                        return self.send_json(400, {"error": "Drink name is required."})
+                    emoji = (data.get("emoji") or "").strip() or select_drink_emoji(name, notes)
+                    conn.execute(
+                        "UPDATE drinks SET name = ?, emoji = ?, notes = ? WHERE id = ?",
+                        (name, emoji, notes, drink_id),
+                    )
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                if path == "/api/drinks/delete":
+                    drink_id = data.get("drink_id")
+                    dr = conn.execute("SELECT * FROM drinks WHERE id = ?", (drink_id,)).fetchone()
+                    if not dr:
+                        return self.send_json(404, {"error": "Drink not found."})
+                    if not is_admin and dr["created_by"] != user["id"]:
+                        return self.send_json(403, {"error": "Only the Administrator or creator can delete this drink."})
+                    conn.execute("DELETE FROM drinks WHERE id = ?", (drink_id,))
+                    conn.commit()
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 15. UPDATE SETTINGS (ADMIN ONLY)
                 if path == "/api/settings/update":
-                    if user["role"] != "admin":
+                    if not is_admin:
                         return self.send_json(403, {"error": "Only an Administrator can update settings."})
                     allowed_keys = ("event_title", "event_date", "event_time", "announcement", "house_code", "lock_claims")
                     for key in allowed_keys:
@@ -1120,15 +1706,27 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.commit()
                     return self.send_json(200, fetch_dashboard_state(conn, user))
 
-                # 12. ADMIN USER & PRIVILEGES MANAGEMENT
+                # 16. ADMIN USER & PRIVILEGES MANAGEMENT (INCLUDING EDITING PEOPLE'S NAMES)
                 if path == "/api/users/manage":
-                    if user["role"] != "admin":
-                        return self.send_json(403, {"error": "Only an Administrator can manage user privileges."})
+                    if not is_admin:
+                        return self.send_json(403, {"error": "Only an Administrator can manage users and privileges."})
                     action = data.get("action")
                     target_id = data.get("user_id")
                     target = conn.execute("SELECT * FROM users WHERE id = ?", (target_id,)).fetchone()
                     if not target:
                         return self.send_json(404, {"error": "User not found."})
+
+                    if action == "rename_user":
+                        new_display_name = (data.get("display_name") or "").strip()
+                        if not new_display_name:
+                            return self.send_json(400, {"error": "Display name cannot be empty."})
+                        conn.execute(
+                            "UPDATE users SET display_name = ? WHERE id = ?",
+                            (new_display_name, target_id),
+                        )
+                        conn.commit()
+                        updated_me = self.get_current_user(conn)
+                        return self.send_json(200, fetch_dashboard_state(conn, updated_me))
 
                     if action == "toggle_dish_editor":
                         new_val = 0 if target["can_edit_dishes"] else 1

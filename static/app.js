@@ -2,17 +2,22 @@
  * 82 Harrow Christmas Dinner Dashboard - Frontend Controller
  * Includes:
  * - Animated Snowy Background Canvas
- * - Morgan's Administrator Privileges + People & Privileges Subtab (Dish Editor & Admin toggles)
+ * - Morgan's Administrator Privileges (Edit people's names, selections & recipes + Dish Editor & Admin toggles)
  * - "Assign to me" -> "Sorted by THEIR NAME"
  * - Expandable Dish Items with "Add Recipe URL" -> Auto-pulled Ingredients, Prep Time, Cook Time & Short Description
+ * - Compiled Recipe Ingredient List (Scaled for 7 people + UK Supermarket £ Costs + Total & Total ÷ 7)
+ * - Secondary Meat Poll (Primary = Chicken non-negotiable; Gammon, Beef, Lamb, Pork, Beef Wellington + Live Pie Chart)
+ * - Drinks Board (Everyone uploads options + AI-matched Emoji + 1 switchable drink selection per person)
  */
 
 const TOKEN_STORAGE_KEY = "harrow82_auth_token";
+const HOUSE_SIZE = 7;
 
 const QUICK_PRESETS = [
-  { title: "Roast Turkey & Basting", category: "Mains", max_claims: 1, notes: "The centrepiece!" },
+  { title: "Roast Chicken (Primary Meat)", category: "Mains", max_claims: 1, notes: "Non-negotiable centrepiece!" },
+  { title: "Secondary Meat (From Meat Poll)", category: "Mains", max_claims: 1, notes: "Winner of the 82 Harrow Meat Poll" },
   { title: "Vegetarian / Vegan Main", category: "Mains", max_claims: 1, notes: "Nut roast or veggie alternative" },
-  { title: "Crispy Roast Potatoes", category: "Sides & Trimmings", max_claims: 2, notes: "Plenty for the whole house" },
+  { title: "Crispy Roast Potatoes", category: "Sides & Trimmings", max_claims: 2, notes: "Plenty for 7 people" },
   { title: "Pigs in Blankets", category: "Sides & Trimmings", max_claims: 1, notes: "Get extra!" },
   { title: "Yorkshire Puddings", category: "Sides & Trimmings", max_claims: 1, notes: "Essential on every plate" },
   { title: "Sage & Onion Stuffing", category: "Sides & Trimmings", max_claims: 1, notes: "" },
@@ -21,9 +26,6 @@ const QUICK_PRESETS = [
   { title: "Cauliflower Cheese", category: "Sides & Trimmings", max_claims: 1, notes: "" },
   { title: "Proper Rich Gravy", category: "Sides & Trimmings", max_claims: 1, notes: "Lots of it!" },
   { title: "Cranberry & Bread Sauces", category: "Sides & Trimmings", max_claims: 1, notes: "" },
-  { title: "Mulled Wine & Festive Drinks", category: "Drinks", max_claims: 2, notes: "" },
-  { title: "Prosecco / Table Wine / Beers", category: "Drinks", max_claims: 2, notes: "" },
-  { title: "Soft Drinks & Mixers", category: "Drinks", max_claims: 1, notes: "" },
   { title: "Christmas Pudding / Yule Log", category: "Puddings & Desserts", max_claims: 1, notes: "With custard or cream" },
   { title: "Mince Pies & After Dinner Treats", category: "Puddings & Desserts", max_claims: 1, notes: "" },
   { title: "Christmas Crackers, Table & Music", category: "Table & Setup", max_claims: 2, notes: "Set the 82 Harrow dining table" },
@@ -53,10 +55,39 @@ let activeFilter = "ALL";
 let searchQuery = "";
 let pollTimer = null;
 
-// Track which dish items are currently expanded & which have the recipe URL editor open
 const expandedDishIds = new Set();
 const editingRecipeDishIds = new Set();
 const manualRecipeDishIds = new Set();
+
+// =====================================================================
+// CLIENT-SIDE AI DRINK EMOJI MATCHER (FOR LIVE TYPING PREVIEW)
+// =====================================================================
+function selectDrinkEmojiClient(name, notes = "") {
+  const text = `${name || ""} ${notes || ""}`.toLowerCase();
+  const rules = [
+    [["mulled wine", "gluhwein", "glühwein", "red wine", "merlot", "malbec", "cabernet", "pinot noir", "shiraz", "rioja", "claret", "port", "bordeaux"], "🍷"],
+    [["prosecco", "champagne", "cava", "buck's fizz", "bucks fizz", "mimosa", "bellini", "sparkling wine", "bubbly", "fizz"], "🥂"],
+    [["white wine", "sauvignon", "chardonnay", "pinot grigio", "riesling", "rosé", "rose wine"], "🍾"],
+    [["guinness", "stout", "porter", "murphy"], "🍺"],
+    [["cider", "cidre", "kopparberg", "strongbow", "thatchers", "bulmers", "rekorderlig", "inch", "scrumpy"], "🍻"],
+    [["beer", "lager", "ale", "ipa", "pilsner", "stella", "peroni", "corona", "heineken", "birra", "moretti", "carling", "fosters", "kronenbourg", "madri", "asahi", "craft beer", "pint"], "🍺"],
+    [["baileys", "irish cream", "whisky", "whiskey", "scotch", "bourbon", "jack daniel", "jameson", "brandy", "cognac", "hennessy", "amaretto", "disaronno", "kahlua", "tia maria", "southern comfort"], "🥃"],
+    [["tequila", "sambuca", "jager", "jäger", "fireball", "shot", "shots", "limoncello", "schnapps", "sourz"], "🥃"],
+    [["rum", "captain morgan", "malibu", "kraken", "bacardi", "spiced rum", "dark rum"], "🍹"],
+    [["gin", "g&t", "g & t", "martini", "espresso martini", "negroni", "cosmopolitan", "vodka", "smirnoff", "absolut", "grey goose"], "🍸"],
+    [["cocktail", "aperol", "spritz", "pimm", "mojito", "margarita", "daiquiri", "pina colada", "piña colada", "sangria", "punch", "sex on the beach", "passionfruit"], "🍹"],
+    [["hot chocolate", "cocoa", "coffee", "tea", "latte", "mocha", "chai", "mulled apple", "hot toddy"], "☕"],
+    [["eggnog", "milk", "milkshake", "white russian", "horlicks"], "🥛"],
+    [["coke", "coca-cola", "coca cola", "diet coke", "pepsi", "lemonade", "sprite", "7up", "fanta", "tango", "irn-bru", "irn bru", "dr pepper", "ginger beer", "ginger ale", "soda", "soft drink", "fizzy"], "🥤"],
+    [["juice", "orange juice", "apple juice", "cranberry", "elderflower", "shloer", "appletiser", "j2o", "oasis", "ribena", "vimto", "cordial", "squash", "mocktail", "non-alcoholic", "0%", "alcohol free"], "🧃"],
+    [["water", "sparkling water", "san pellegrino", "evian", "tap water"], "💧"],
+  ];
+  for (const [keywords, emoji] of rules) {
+    if (keywords.some((k) => text.includes(k))) return emoji;
+  }
+  if (text.includes("wine")) return "🍷";
+  return "🍹";
+}
 
 // =====================================================================
 // ANIMATED SNOWY BACKGROUND
@@ -288,6 +319,8 @@ function renderDashboard() {
   const settings = appState.settings || {};
   const dishes = appState.dishes || [];
   const users = appState.users || [];
+  const meatVotes = (appState.meat_poll && appState.meat_poll.votes) || [];
+  const drinks = appState.drinks || [];
 
   // Header info
   document.getElementById("header-event-title").textContent =
@@ -340,11 +373,13 @@ function renderDashboard() {
     }
   }
 
-  // Compute Stats
+  // Compute Stats & Recipe Total Cost
   const totalDishes = dishes.length;
   let totalSpots = 0;
   let claimedSpots = 0;
   let myClaimsCount = 0;
+  let totalRecipeCostGbp = 0;
+  let compiledIngredientCount = 0;
 
   dishes.forEach((d) => {
     const claimsCount = (d.claims || []).length;
@@ -353,23 +388,34 @@ function renderDashboard() {
     if ((d.claims || []).some((c) => c.user_id === user.id)) {
       myClaimsCount += 1;
     }
+    (d.compiled_ingredients || []).forEach((item) => {
+      compiledIngredientCount += 1;
+      totalRecipeCostGbp += Number(item.estimated_cost_gbp || 0);
+    });
   });
 
-  const unclaimedSpots = Math.max(0, totalSpots - claimedSpots);
+  const costEachGbp = totalRecipeCostGbp / HOUSE_SIZE;
   const pct = totalSpots > 0 ? Math.round((claimedSpots / totalSpots) * 100) : 0;
 
   document.getElementById("stat-total-dishes").textContent = String(totalDishes);
   document.getElementById("stat-total-spots").textContent = `${totalSpots} total spot${totalSpots === 1 ? "" : "s"}`;
   document.getElementById("stat-claimed-spots").textContent = `${claimedSpots} / ${totalSpots}`;
   document.getElementById("stat-progress-fill").style.width = `${pct}%`;
-  document.getElementById("stat-unclaimed-spots").textContent = String(unclaimedSpots);
+  document.getElementById("stat-cost-each").textContent = `£${costEachGbp.toFixed(2)}`;
+  document.getElementById("stat-total-cost-sub").textContent = `£${totalRecipeCostGbp.toFixed(2)} total recipe cost`;
   document.getElementById("stat-my-claims").textContent = String(myClaimsCount);
   document.getElementById("stat-housemates-count").textContent = `${users.length} ${users.length === 1 ? "person" : "people"} logged in`;
 
   document.getElementById("tab-count-dishes").textContent = String(totalDishes);
+  document.getElementById("tab-count-recipes").textContent = String(compiledIngredientCount);
+  document.getElementById("tab-count-meat").textContent = String(meatVotes.length);
+  document.getElementById("tab-count-drinks").textContent = String(drinks.length);
   document.getElementById("tab-count-housemates").textContent = String(users.length);
 
   renderDishesList();
+  renderCompiledRecipesList();
+  renderMeatPoll();
+  renderDrinksBoard();
   renderPeopleAndPrivileges();
   renderHousematesRoster();
   if (isAdmin) {
@@ -378,7 +424,7 @@ function renderDashboard() {
 }
 
 // =====================================================================
-// EXPANDABLE DISHES LIST ("Assign to me" -> "Sorted by THEIR NAME" + Recipe URL)
+// VIEW 1: EXPANDABLE DISHES LIST
 // =====================================================================
 function formatSortedByNames(claims) {
   if (!claims || claims.length === 0) return "";
@@ -461,7 +507,6 @@ function renderDishesList() {
       const showRecipeForm = !hasRecipe || editingRecipeDishIds.has(d.id);
       const showManualForm = manualRecipeDishIds.has(d.id);
 
-      // "Sorted by THEIR NAME" display badge
       let sortedByHtml = "";
       if (claims.length > 0) {
         const sortedNames = formatSortedByNames(claims);
@@ -490,7 +535,6 @@ function renderDishesList() {
         `;
       }
 
-      // "Assign to me" or "Unassign" button on the main row
       let assignButtonHtml = "";
       if (myClaim) {
         assignButtonHtml = `
@@ -516,12 +560,10 @@ function renderDishesList() {
         `;
       }
 
-      // Recipe indicator badge on collapsed row
       const recipeIndicatorHtml = hasRecipe
         ? `<span class="recipe-indicator-pill recipe-indicator-ready">📖 Recipe attached</span>`
         : `<span class="recipe-indicator-pill recipe-indicator-empty">🔗 Expand to add recipe URL</span>`;
 
-      // Edit/Delete dish buttons for Admin & Dish Editors
       const editorButtonsHtml = canEditDishes
         ? `
           <button type="button" class="icon-btn btn-edit-dish" data-dish-id="${d.id}" title="Edit Dish">✏️</button>
@@ -529,7 +571,6 @@ function renderDishesList() {
         `
         : "";
 
-      // EXPANDED PANEL: Recipe section
       const ingredientsList = Array.isArray(d.recipe_ingredients) ? d.recipe_ingredients : [];
       const recipeSectionHtml = showRecipeForm
         ? `
@@ -538,7 +579,7 @@ function renderDishesList() {
               <div>
                 <h4>🔗 ${hasRecipe ? "Update Recipe URL" : "Add Recipe URL"}</h4>
                 <p style="font-size:0.83rem; color:var(--text-muted);">
-                  Paste a recipe link below (e.g. BBC Good Food, Jamie Oliver, Allrecipes, Tesco) to automatically pull its ingredients, prep time, cook time, and description.
+                  Paste a recipe link below (e.g. BBC Good Food, Jamie Oliver, Allrecipes, Tesco) to automatically pull its ingredients, prep time, cook time, description, and 7-person UK supermarket cost estimate.
                 </p>
               </div>
               ${
@@ -580,9 +621,15 @@ function renderDishesList() {
 
             <!-- Manual / Fallback Recipe Details Editor -->
             <div class="manual-recipe-editor ${showManualForm ? "" : "hidden"}" data-dish-id="${d.id}">
-              <div class="form-group">
-                <label>Recipe Title</label>
-                <input type="text" class="manual-recipe-title" data-dish-id="${d.id}" value="${escapeHtml(d.recipe_title || d.title)}" />
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Recipe Title</label>
+                  <input type="text" class="manual-recipe-title" data-dish-id="${d.id}" value="${escapeHtml(d.recipe_title || d.title)}" />
+                </div>
+                <div class="form-group">
+                  <label>Recipe Serves (Original Yield)</label>
+                  <input type="number" min="1" max="30" class="manual-recipe-servings" data-dish-id="${d.id}" value="${escapeHtml(d.recipe_servings || 4)}" />
+                </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
@@ -603,7 +650,7 @@ function renderDishesList() {
                 <textarea rows="5" class="manual-recipe-ings" data-dish-id="${d.id}" placeholder="2kg Maris Piper potatoes&#10;100g goose fat&#10;Fresh rosemary sprigs">${escapeHtml(ingredientsList.join("\n"))}</textarea>
               </div>
               <button type="button" class="btn btn-green btn-sm btn-save-manual-recipe" data-dish-id="${d.id}">
-                💾 Save Recipe Details
+                💾 Save Recipe &amp; Recalculate 7-Person Costs
               </button>
             </div>
           </div>
@@ -624,7 +671,7 @@ function renderDishesList() {
               </div>
               <div style="display:flex; gap:0.4rem;">
                 <button type="button" class="btn btn-secondary btn-sm btn-edit-recipe-url" data-dish-id="${d.id}">
-                  🔄 Change URL / Edit
+                  🔄 Change URL / Edit Recipe
                 </button>
               </div>
             </div>
@@ -637,7 +684,7 @@ function renderDishesList() {
                 🔥 <strong>Cook Time:</strong> ${escapeHtml(d.recipe_cook_time || "Not listed")}
               </div>
               <div class="recipe-time-pill">
-                🥕 <strong>Ingredients:</strong> ${ingredientsList.length} item${ingredientsList.length === 1 ? "" : "s"}
+                🍽️ <strong>Original Yield:</strong> Serves ${escapeHtml(d.recipe_servings || 4)} (auto-scaled to 7 in Recipe List tab)
               </div>
             </div>
 
@@ -656,13 +703,12 @@ function renderDishesList() {
                       ${ingredientsList.map((ing) => `<li><span>${escapeHtml(ing)}</span></li>`).join("")}
                     </ul>
                   `
-                  : `<p class="no-claims-yet">No structured ingredient list detected on that page — click "Change URL / Edit" to add ingredients or try another recipe link.</p>`
+                  : `<p class="no-claims-yet">No structured ingredient list detected on that page — click "Change URL / Edit Recipe" to add ingredients or try another recipe link.</p>`
               }
             </div>
           </div>
         `;
 
-      // EXPANDED PANEL: Assignment & Prep Notes box
       const claimsDetailHtml =
         claims.length === 0
           ? `<div class="no-claims-yet">Nobody has clicked "Assign to me" on this dish yet.</div>`
@@ -692,15 +738,15 @@ function renderDishesList() {
                             : `<span class="status-pill">${escapeHtml(STATUS_LABELS[c.status] || "📝 Planned")}</span>`
                         }
                         ${
-                          isAdmin && !isThisMine
-                            ? `<button type="button" class="icon-btn btn-admin-unclaim" data-dish-id="${d.id}" data-user-id="${c.user_id}" title="Unassign">✕</button>`
+                          isAdmin
+                            ? `<button type="button" class="icon-btn btn-admin-unclaim" data-dish-id="${d.id}" data-user-id="${c.user_id}" title="Unassign ${escapeHtml(c.display_name)}">✕</button>`
                             : ""
                         }
                       </div>
                     </div>
                     ${c.note ? `<div class="claim-note-text">“${escapeHtml(c.note)}”</div>` : ""}
                     ${
-                      isThisMine
+                      canEditClaim
                         ? `
                           <div class="claim-note-editor">
                             <input
@@ -729,7 +775,7 @@ function renderDishesList() {
           adminAssignHtml = `
             <div class="admin-assign-row">
               <select class="admin-assign-select" data-dish-id="${d.id}">
-                <option value="">👑 Assign someone...</option>
+                <option value="">👑 Assign someone to this dish...</option>
                 ${unclaimedUsers
                   .map((u) => `<option value="${u.id}">${escapeHtml(u.display_name)} (@${escapeHtml(u.username)})</option>`)
                   .join("")}
@@ -744,7 +790,6 @@ function renderDishesList() {
 
       return `
         <article class="dish-item ${myClaim ? "dish-mine" : ""} ${isExpanded ? "expanded" : ""}" data-dish-id="${d.id}">
-          <!-- Main Collapsible Row -->
           <div class="dish-row-main" data-toggle-dish="${d.id}">
             <div class="dish-left">
               <span class="expand-chevron" title="Click to expand recipe & details">▾</span>
@@ -772,7 +817,6 @@ function renderDishesList() {
             </div>
           </div>
 
-          <!-- Expandable Recipe & Assignment Drawer -->
           <div class="dish-expanded-panel ${isExpanded ? "" : "hidden"}">
             <div class="expanded-grid">
               ${recipeSectionHtml}
@@ -808,7 +852,6 @@ function toggleDishExpanded(dishId) {
 }
 
 function attachDishListListeners() {
-  // Expand / collapse when clicking main row or button
   document.querySelectorAll("[data-toggle-dish]").forEach((row) => {
     row.addEventListener("click", () => {
       const dishId = Number(row.getAttribute("data-toggle-dish"));
@@ -823,7 +866,6 @@ function attachDishListListeners() {
     });
   });
 
-  // "Assign to me"
   document.querySelectorAll(".btn-claim-dish").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -839,7 +881,6 @@ function attachDishListListeners() {
     });
   });
 
-  // "Unassign me"
   document.querySelectorAll(".btn-unclaim-dish").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -855,7 +896,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Admin unassign another user
   document.querySelectorAll(".btn-admin-unclaim").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -873,7 +913,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Admin assign housemate
   document.querySelectorAll(".btn-admin-assign").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -892,7 +931,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Update claim status
   document.querySelectorAll(".claim-status-select").forEach((sel) => {
     sel.addEventListener("change", async () => {
       const claimId = Number(sel.getAttribute("data-claim-id"));
@@ -909,7 +947,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Save claim note
   document.querySelectorAll(".btn-save-claim-note").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const claimId = Number(btn.getAttribute("data-claim-id"));
@@ -928,7 +965,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Recipe URL form submit (Pull Recipe from URL)
   document.querySelectorAll(".recipe-url-form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -940,7 +976,7 @@ function attachDishListListeners() {
       const targetUrl = urlInput.value.trim();
       const originalText = submitBtn.textContent;
       submitBtn.disabled = true;
-      submitBtn.textContent = "⏳ Pulling recipe...";
+      submitBtn.textContent = "⏳ Pulling recipe & 7-person costs...";
 
       try {
         let newState;
@@ -950,7 +986,6 @@ function attachDishListListeners() {
             recipe_url: targetUrl,
           });
         } catch (backendErr) {
-          // If backend couldn't fetch externally directly, try fetching HTML in browser and send to parser
           if (backendErr.payload && backendErr.payload.needs_browser_fetch) {
             let fetchedHtml = "";
             const proxies = [
@@ -984,7 +1019,7 @@ function attachDishListListeners() {
         manualRecipeDishIds.delete(dishId);
         expandedDishIds.add(dishId);
         updateState(newState, true);
-        showToast("📖 Pulled recipe ingredients, prep & cook time!");
+        showToast("📖 Pulled recipe & added 7-person ingredients to Recipe List!");
       } catch (err) {
         showToast(err.message);
         submitBtn.disabled = false;
@@ -995,7 +1030,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Open recipe URL editor
   document.querySelectorAll(".btn-edit-recipe-url").forEach((btn) => {
     btn.addEventListener("click", () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1005,7 +1039,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Cancel recipe URL edit
   document.querySelectorAll(".btn-cancel-recipe-edit").forEach((btn) => {
     btn.addEventListener("click", () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1015,7 +1048,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Toggle manual recipe details editor
   document.querySelectorAll(".btn-toggle-manual-recipe").forEach((btn) => {
     btn.addEventListener("click", () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1028,12 +1060,12 @@ function attachDishListListeners() {
     });
   });
 
-  // Save manual/edited recipe details
   document.querySelectorAll(".btn-save-manual-recipe").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
       const urlInput = document.querySelector(`.recipe-url-input[data-dish-id="${dishId}"]`);
       const titleInput = document.querySelector(`.manual-recipe-title[data-dish-id="${dishId}"]`);
+      const servingsInput = document.querySelector(`.manual-recipe-servings[data-dish-id="${dishId}"]`);
       const prepInput = document.querySelector(`.manual-recipe-prep[data-dish-id="${dishId}"]`);
       const cookInput = document.querySelector(`.manual-recipe-cook[data-dish-id="${dishId}"]`);
       const descInput = document.querySelector(`.manual-recipe-desc[data-dish-id="${dishId}"]`);
@@ -1046,6 +1078,7 @@ function attachDishListListeners() {
           manual_override: true,
           recipe_url: (urlInput && urlInput.value.trim()) || "https://custom-recipe",
           recipe_title: titleInput ? titleInput.value.trim() : "",
+          recipe_servings: servingsInput ? Number(servingsInput.value) || 4 : 4,
           recipe_prep_time: prepInput ? prepInput.value.trim() : "",
           recipe_cook_time: cookInput ? cookInput.value.trim() : "",
           recipe_description: descInput ? descInput.value.trim() : "",
@@ -1055,7 +1088,7 @@ function attachDishListListeners() {
         manualRecipeDishIds.delete(dishId);
         expandedDishIds.add(dishId);
         updateState(newState, true);
-        showToast("📖 Saved recipe details!");
+        showToast("📖 Saved recipe & updated 7-person cost table!");
       } catch (err) {
         showToast(err.message);
         btn.disabled = false;
@@ -1063,7 +1096,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Clear recipe
   document.querySelectorAll(".btn-clear-recipe").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1083,7 +1115,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Edit dish modal (Admin & Dish Editors)
   document.querySelectorAll(".btn-edit-dish").forEach((btn) => {
     btn.addEventListener("click", () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1098,7 +1129,6 @@ function attachDishListListeners() {
     });
   });
 
-  // Delete dish (Admin & Dish Editors)
   document.querySelectorAll(".btn-delete-dish").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const dishId = Number(btn.getAttribute("data-dish-id"));
@@ -1117,7 +1147,589 @@ function attachDishListListeners() {
 }
 
 // =====================================================================
-// SUBTAB 1: PEOPLE & PRIVILEGES (DISH EDITOR & ADMIN TOGGLES)
+// VIEW 2: COMPILED RECIPE LIST & 7-PERSON UK SUPERMARKET COSTS
+// =====================================================================
+function renderCompiledRecipesList() {
+  const user = appState.current_user;
+  const isAdmin = user.role === "admin";
+  const dishes = appState.dishes || [];
+
+  const emptyEl = document.getElementById("recipes-empty-state");
+  const wrapperEl = document.getElementById("recipes-compiled-wrapper");
+  const tbody = document.getElementById("compiled-ingredients-tbody");
+  const adminCol = document.getElementById("compiled-admin-col");
+
+  if (isAdmin) {
+    adminCol.classList.remove("hidden");
+  } else {
+    adminCol.classList.add("hidden");
+  }
+
+  const rows = [];
+  let grandTotal = 0;
+  let recipeCount = 0;
+
+  dishes.forEach((d) => {
+    const compiled = d.compiled_ingredients || [];
+    if (compiled.length > 0) {
+      recipeCount += 1;
+      const sortedNames = formatSortedByNames(d.claims || []) || "Unassigned";
+      compiled.forEach((item, idx) => {
+        const cost = Number(item.estimated_cost_gbp || 0);
+        grandTotal += cost;
+        rows.push({
+          dishId: d.id,
+          dishTitle: d.title,
+          recipeTitle: d.recipe_title || d.title,
+          recipeUrl: d.recipe_url,
+          recipeServings: d.recipe_servings || 4,
+          sortedNames,
+          itemIndex: idx,
+          ingredient: item.ingredient || item.original_text,
+          originalText: item.original_text || "",
+          amountFor7: item.amount_for_7 || "Scaled for 7",
+          cost,
+        });
+      });
+    }
+  });
+
+  if (rows.length === 0) {
+    wrapperEl.classList.add("hidden");
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+  wrapperEl.classList.remove("hidden");
+
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(r.dishTitle)}</strong>
+          <div style="font-size:0.76rem; color:var(--text-muted);">
+            ${
+              r.recipeUrl
+                ? `<a href="${escapeHtml(r.recipeUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--green-primary); text-decoration:none;">🔗 Recipe (Serves ${r.recipeServings} → 7) ↗</a>`
+                : `Serves ${r.recipeServings} → 7`
+            }
+          </div>
+        </td>
+        <td>
+          <span style="font-size:0.83rem; font-weight:600;">${escapeHtml(r.sortedNames)}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(r.ingredient)}</strong>
+          ${
+            r.originalText && r.originalText !== r.ingredient
+              ? `<div style="font-size:0.75rem; color:var(--text-muted);">From recipe: “${escapeHtml(r.originalText)}”</div>`
+              : ""
+          }
+        </td>
+        <td>
+          <span class="amount-7-badge">${escapeHtml(r.amountFor7)}</span>
+        </td>
+        <td class="cost-gbp-cell">
+          £${r.cost.toFixed(2)}
+        </td>
+        ${
+          isAdmin
+            ? `
+              <td>
+                <div style="display:flex; gap:0.35rem;">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm btn-edit-compiled-item"
+                    data-dish-id="${r.dishId}"
+                    data-item-idx="${r.itemIndex}"
+                    data-ing="${escapeHtml(r.ingredient)}"
+                    data-amt="${escapeHtml(r.amountFor7)}"
+                    data-cost="${r.cost.toFixed(2)}"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm btn-jump-edit-recipe"
+                    data-dish-id="${r.dishId}"
+                    title="Edit full recipe on Dishes tab"
+                  >
+                    📖 Recipe
+                  </button>
+                </div>
+              </td>
+            `
+            : ""
+        }
+      </tr>
+    `
+    )
+    .join("");
+
+  const perPerson = grandTotal / HOUSE_SIZE;
+  document.getElementById("recipe-grand-total").textContent = `£${grandTotal.toFixed(2)}`;
+  document.getElementById("recipe-cost-per-person").textContent = `£${perPerson.toFixed(2)}`;
+  document.getElementById("recipe-total-items-count").textContent = `${rows.length} ingredient${rows.length === 1 ? "" : "s"} across ${recipeCount} recipe${recipeCount === 1 ? "" : "s"}`;
+
+  if (isAdmin) {
+    tbody.querySelectorAll(".btn-edit-compiled-item").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const dishId = Number(btn.getAttribute("data-dish-id"));
+        const itemIdx = Number(btn.getAttribute("data-item-idx"));
+        const curIng = btn.getAttribute("data-ing") || "";
+        const curAmt = btn.getAttribute("data-amt") || "";
+        const curCost = btn.getAttribute("data-cost") || "1.50";
+
+        const newIng = prompt("Edit Ingredient Name:", curIng);
+        if (newIng === null) return;
+        const newAmt = prompt("Edit Amount Needed for 7 People:", curAmt);
+        if (newAmt === null) return;
+        const newCostStr = prompt("Edit Estimated UK Supermarket Cost (£):", curCost);
+        if (newCostStr === null) return;
+
+        try {
+          const newState = await apiRequest("/api/recipes/update_item", "POST", {
+            dish_id: dishId,
+            item_index: itemIdx,
+            ingredient: newIng.trim(),
+            amount_for_7: newAmt.trim(),
+            estimated_cost_gbp: parseFloat(newCostStr.replace("£", "")) || 0,
+          });
+          updateState(newState, true);
+          showToast("Updated 7-person ingredient & cost!");
+        } catch (err) {
+          showToast(err.message);
+        }
+      });
+    });
+
+    tbody.querySelectorAll(".btn-jump-edit-recipe").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dishId = Number(btn.getAttribute("data-dish-id"));
+        expandedDishIds.add(dishId);
+        editingRecipeDishIds.add(dishId);
+        manualRecipeDishIds.add(dishId);
+        setActiveView("dishes");
+        renderDishesList();
+      });
+    });
+  }
+}
+
+// =====================================================================
+// VIEW 3: MEAT POLL & LIVE PIE CHART
+// =====================================================================
+function renderMeatPoll() {
+  const user = appState.current_user;
+  const isAdmin = user.role === "admin";
+  const poll = appState.meat_poll || { options: [], votes: [] };
+  const options = poll.options || [];
+  const votes = poll.votes || [];
+  const users = appState.users || [];
+
+  const myVoteObj = votes.find((v) => v.user_id === user.id);
+  const myChoice = myVoteObj ? myVoteObj.choice : null;
+
+  const votesByOption = {};
+  options.forEach((o) => {
+    votesByOption[o.id] = [];
+  });
+  votes.forEach((v) => {
+    if (votesByOption[v.choice]) {
+      votesByOption[v.choice].push(v);
+    }
+  });
+
+  const listEl = document.getElementById("meat-options-list");
+  listEl.innerHTML = options
+    .map((opt) => {
+      const optVotes = votesByOption[opt.id] || [];
+      const isMine = myChoice === opt.id;
+      const pct = votes.length > 0 ? Math.round((optVotes.length / votes.length) * 100) : 0;
+
+      const votersHtml =
+        optVotes.length > 0
+          ? `
+            <div class="meat-voters-row">
+              ${optVotes
+                .map(
+                  (v) => `
+                    <span class="voter-chip">
+                      <span class="avatar avatar-sm" style="width:18px;height:18px;font-size:0.62rem;background-color:${escapeHtml(v.avatar_color)}">
+                        ${escapeHtml(getInitials(v.display_name))}
+                      </span>
+                      ${escapeHtml(v.display_name)}${v.user_id === user.id ? " (You)" : ""}
+                    </span>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="meat-option-btn ${isMine ? "my-meat-vote" : ""}"
+          data-meat-choice="${opt.id}"
+        >
+          <div class="meat-option-top">
+            <div class="meat-option-title">
+              <span class="meat-emoji-big">${opt.emoji}</span>
+              <span>${escapeHtml(opt.label)}</span>
+              ${isMine ? '<span class="priv-pill priv-pill-editor">✓ Your Vote</span>' : ""}
+            </div>
+            <span class="meat-vote-count-pill">
+              ${optVotes.length} vote${optVotes.length === 1 ? "" : "s"} (${pct}%)
+            </span>
+          </div>
+          ${votersHtml}
+        </button>
+      `;
+    })
+    .join("");
+
+  listEl.querySelectorAll(".meat-option-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const choice = btn.getAttribute("data-meat-choice");
+      try {
+        btn.disabled = true;
+        const newState = await apiRequest("/api/meat_poll/vote", "POST", { choice });
+        updateState(newState, true);
+        showToast("🗳️ Secondary meat vote recorded!");
+      } catch (err) {
+        showToast(err.message);
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Admin Override Box for Morgan
+  const adminBox = document.getElementById("admin-meat-override");
+  if (isAdmin && users.length > 0) {
+    adminBox.classList.remove("hidden");
+    const userSel = document.getElementById("admin-meat-user-select");
+    const prevVal = userSel.value;
+    userSel.innerHTML = users
+      .map((u) => {
+        const uVote = votes.find((v) => v.user_id === u.id);
+        const optObj = uVote ? options.find((o) => o.id === uVote.choice) : null;
+        const curLabel = optObj ? `${optObj.emoji} ${optObj.label}` : "No vote yet";
+        return `<option value="${u.id}">${escapeHtml(u.display_name)} (${escapeHtml(curLabel)})</option>`;
+      })
+      .join("");
+    if (prevVal && Array.from(userSel.options).some((o) => o.value === prevVal)) {
+      userSel.value = prevVal;
+    }
+  } else {
+    adminBox.classList.add("hidden");
+  }
+
+  document.getElementById("meat-total-votes-label").textContent = `${votes.length} total vote${votes.length === 1 ? "" : "s"} cast`;
+
+  drawMeatPieChart(options, votesByOption, votes.length);
+}
+
+function drawMeatPieChart(options, votesByOption, totalVotes) {
+  const canvas = document.getElementById("meat-pie-canvas");
+  const legendEl = document.getElementById("meat-chart-legend");
+  if (!canvas || !legendEl) return;
+
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = Math.min(w, h) / 2 - 22;
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (totalVotes === 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#ece4d3";
+    ctx.fill();
+    ctx.strokeStyle = "#d5c9b0";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#556659";
+    ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No votes yet — vote on the left!", cx, cy);
+  } else {
+    let startAngle = -Math.PI / 2;
+    options.forEach((opt) => {
+      const count = (votesByOption[opt.id] || []).length;
+      if (count === 0) return;
+      const sliceAngle = (count / totalVotes) * Math.PI * 2;
+      const endAngle = startAngle + sliceAngle;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = opt.color;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Draw emoji + percentage inside slice
+      const midAngle = startAngle + sliceAngle / 2;
+      const labelR = totalVotes === count ? 0 : radius * 0.62;
+      const lx = cx + Math.cos(midAngle) * labelR;
+      const ly = cy + Math.sin(midAngle) * labelR;
+      const pct = Math.round((count / totalVotes) * 100);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${opt.emoji} ${pct}%`, lx, ly);
+
+      startAngle = endAngle;
+    });
+  }
+
+  // Render Legend
+  legendEl.innerHTML = options
+    .map((opt) => {
+      const count = (votesByOption[opt.id] || []).length;
+      const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+      return `
+        <div class="legend-row">
+          <div class="legend-left">
+            <span class="legend-swatch" style="background-color: ${escapeHtml(opt.color)}"></span>
+            <span>${opt.emoji} ${escapeHtml(opt.label)}</span>
+          </div>
+          <strong>${count} vote${count === 1 ? "" : "s"} (${pct}%)</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+// =====================================================================
+// VIEW 4: DRINKS BOARD (EVERYONE UPLOADS + AI EMOJI + 1 DRINK SELECTION)
+// =====================================================================
+function renderDrinksBoard() {
+  const user = appState.current_user;
+  const isAdmin = user.role === "admin";
+  const drinks = appState.drinks || [];
+  const users = appState.users || [];
+
+  const emptyEl = document.getElementById("drinks-empty-state");
+  const gridEl = document.getElementById("drinks-grid");
+
+  // Find which drink the current user is currently assigned to
+  let myCurrentDrinkId = null;
+  drinks.forEach((dr) => {
+    if ((dr.drinkers || []).some((d) => d.user_id === user.id)) {
+      myCurrentDrinkId = dr.id;
+    }
+  });
+
+  // Admin Override Box for Morgan
+  const adminDrinkBox = document.getElementById("admin-drink-override");
+  if (isAdmin && users.length > 0 && drinks.length > 0) {
+    adminDrinkBox.classList.remove("hidden");
+    const uSel = document.getElementById("admin-drink-user-select");
+    const dSel = document.getElementById("admin-drink-choice-select");
+    const prevUser = uSel.value;
+    const prevDrink = dSel.value;
+
+    uSel.innerHTML = users
+      .map((u) => `<option value="${u.id}">${escapeHtml(u.display_name)} (@${escapeHtml(u.username)})</option>`)
+      .join("");
+    if (prevUser && Array.from(uSel.options).some((o) => o.value === prevUser)) {
+      uSel.value = prevUser;
+    }
+
+    dSel.innerHTML =
+      drinks
+        .map((dr) => `<option value="${dr.id}">${dr.emoji} ${escapeHtml(dr.name)}</option>`)
+        .join("") + `<option value="clear">✕ No drink selected</option>`;
+    if (prevDrink && Array.from(dSel.options).some((o) => o.value === prevDrink)) {
+      dSel.value = prevDrink;
+    }
+  } else {
+    adminDrinkBox.classList.add("hidden");
+  }
+
+  if (drinks.length === 0) {
+    gridEl.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+
+  gridEl.innerHTML = drinks
+    .map((dr) => {
+      const drinkers = dr.drinkers || [];
+      const isMine = myCurrentDrinkId === dr.id;
+      const canManageThisDrink = isAdmin || dr.created_by === user.id;
+
+      const drinkersHtml =
+        drinkers.length === 0
+          ? `<span class="no-claims-yet">Nobody assigned to this drink yet</span>`
+          : `
+            <div class="drinkers-chips">
+              ${drinkers
+                .map(
+                  (p) => `
+                    <span class="voter-chip">
+                      <span class="avatar avatar-sm" style="width:20px;height:20px;font-size:0.65rem;background-color:${escapeHtml(p.avatar_color)}">
+                        ${escapeHtml(getInitials(p.display_name))}
+                      </span>
+                      <strong>${escapeHtml(p.display_name)}</strong>${p.user_id === user.id ? " (You)" : ""}
+                    </span>
+                  `
+                )
+                .join("")}
+            </div>
+          `;
+
+      let actionButtonHtml = "";
+      if (isMine) {
+        actionButtonHtml = `
+          <button
+            type="button"
+            class="btn btn-danger-outline btn-sm btn-block btn-select-drink"
+            data-drink-id="clear"
+          >
+            ✓ You're Drinking This (Click to Leave)
+          </button>
+        `;
+      } else if (myCurrentDrinkId !== null) {
+        actionButtonHtml = `
+          <button
+            type="button"
+            class="btn btn-gold btn-sm btn-block btn-select-drink"
+            data-drink-id="${dr.id}"
+          >
+            🔄 Switch to Drinking ${dr.emoji} ${escapeHtml(dr.name)}
+          </button>
+        `;
+      } else {
+        actionButtonHtml = `
+          <button
+            type="button"
+            class="btn btn-green btn-sm btn-block btn-select-drink"
+            data-drink-id="${dr.id}"
+          >
+            ${dr.emoji} I'm Drinking This
+          </button>
+        `;
+      }
+
+      return `
+        <article class="drink-card ${isMine ? "my-drink-choice" : ""}">
+          <div>
+            <div class="drink-card-top">
+              <div class="drink-identity">
+                <div class="drink-emoji-avatar" title="AI-selected emoji">${dr.emoji}</div>
+                <div>
+                  <h3 class="drink-name">${escapeHtml(dr.name)}</h3>
+                  ${dr.notes ? `<p class="drink-notes">${escapeHtml(dr.notes)}</p>` : ""}
+                  ${
+                    dr.created_by_name
+                      ? `<span style="font-size:0.74rem; color:var(--text-muted);">Uploaded by ${escapeHtml(dr.created_by_name)}</span>`
+                      : ""
+                  }
+                </div>
+              </div>
+              ${
+                canManageThisDrink
+                  ? `
+                    <div style="display:flex; gap:0.2rem;">
+                      <button type="button" class="icon-btn btn-edit-drink" data-drink-id="${dr.id}" title="Edit Drink">✏️</button>
+                      <button type="button" class="icon-btn btn-delete-drink" data-drink-id="${dr.id}" title="Delete Drink">🗑️</button>
+                    </div>
+                  `
+                  : ""
+              }
+            </div>
+          </div>
+
+          <div class="drinkers-box">
+            <span class="drinkers-box-label">${dr.emoji} Drinking This (${drinkers.length})</span>
+            ${drinkersHtml}
+          </div>
+
+          <div>
+            ${actionButtonHtml}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  // Select / switch drink listeners
+  gridEl.querySelectorAll(".btn-select-drink").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const val = btn.getAttribute("data-drink-id");
+      const drinkId = val === "clear" ? "clear" : Number(val);
+      try {
+        btn.disabled = true;
+        const newState = await apiRequest("/api/drinks/select", "POST", { drink_id: drinkId });
+        updateState(newState, true);
+        showToast(drinkId === "clear" ? "Cleared drink choice." : "🥂 Updated your drink choice!");
+      } catch (err) {
+        showToast(err.message);
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Edit drink
+  gridEl.querySelectorAll(".btn-edit-drink").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const drinkId = Number(btn.getAttribute("data-drink-id"));
+      const dr = drinks.find((x) => x.id === drinkId);
+      if (!dr) return;
+      const newName = prompt("Edit Drink Name:", dr.name);
+      if (!newName || !newName.trim()) return;
+      const newNotes = prompt("Edit Drink Notes (optional):", dr.notes || "");
+      if (newNotes === null) return;
+      try {
+        const newState = await apiRequest("/api/drinks/update", "POST", {
+          drink_id: drinkId,
+          name: newName.trim(),
+          notes: newNotes.trim(),
+        });
+        updateState(newState, true);
+        showToast("Updated drink option!");
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
+  });
+
+  // Delete drink
+  gridEl.querySelectorAll(".btn-delete-drink").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const drinkId = Number(btn.getAttribute("data-drink-id"));
+      const dr = drinks.find((x) => x.id === drinkId);
+      if (!dr) return;
+      if (!confirm(`Delete "${dr.name}" from the drinks board?`)) return;
+      try {
+        const newState = await apiRequest("/api/drinks/delete", "POST", { drink_id: drinkId });
+        updateState(newState, true);
+        showToast(`Deleted "${dr.name}".`);
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
+  });
+}
+
+// =====================================================================
+// VIEW 5: PEOPLE & PRIVILEGES (EDIT NAMES, DISH EDITORS & ADMINS)
 // =====================================================================
 function renderPeopleAndPrivileges() {
   const listEl = document.getElementById("privileges-people-list");
@@ -1130,7 +1742,7 @@ function renderPeopleAndPrivileges() {
   const subtitle = document.getElementById("privileges-subtitle");
   if (isAdmin) {
     subtitle.innerHTML =
-      "Everyone who has logged into the 82 Harrow dashboard appears below. Click <strong>Dish Editor Privileges</strong> to let someone add dishes to the Christmas dinner component list, or grant <strong>Administrator Privileges</strong>.";
+      "Everyone who has logged into the 82 Harrow dashboard appears below. As Administrator, you can <strong>Edit Anyone's Name</strong>, grant <strong>Dish Editor Privileges</strong>, or grant <strong>Administrator Privileges</strong>.";
   } else {
     subtitle.innerHTML =
       "Everyone who has logged into the 82 Harrow dashboard and their current privileges.";
@@ -1161,11 +1773,20 @@ function renderPeopleAndPrivileges() {
           <div class="privilege-controls">
             <button
               type="button"
+              class="btn btn-secondary btn-sm btn-rename-user"
+              data-user-id="${u.id}"
+              data-user-name="${escapeHtml(u.display_name)}"
+            >
+              ✏️ Edit Name
+            </button>
+
+            <button
+              type="button"
               class="priv-toggle-btn ${uIsEditor ? "active-editor" : ""} btn-toggle-editor"
               data-user-id="${u.id}"
               ${uIsAdmin ? 'disabled title="Administrators automatically have Dish Editor privileges"' : ""}
             >
-              ${uIsEditor ? "✓ 🍽️ Dish Editor Privileges (Active)" : "+ 🍽️ Give Dish Editor Privileges"}
+              ${uIsEditor ? "✓ 🍽️ Dish Editor Privileges" : "+ 🍽️ Give Dish Editor Privileges"}
             </button>
 
             <button
@@ -1174,7 +1795,7 @@ function renderPeopleAndPrivileges() {
               data-user-id="${u.id}"
               ${isMe || isMorgan ? 'disabled title="Morgan Always Has Administrator Privileges"' : ""}
             >
-              ${uIsAdmin ? "✓ 👑 Administrator Privileges (Active)" : "+ 👑 Give Administrator Privileges"}
+              ${uIsAdmin ? "✓ 👑 Administrator Privileges" : "+ 👑 Give Administrator Privileges"}
             </button>
 
             <button
@@ -1227,6 +1848,26 @@ function renderPeopleAndPrivileges() {
     .join("");
 
   if (isAdmin) {
+    listEl.querySelectorAll(".btn-rename-user").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const uid = Number(btn.getAttribute("data-user-id"));
+        const curName = btn.getAttribute("data-user-name") || "";
+        const newName = prompt(`Edit display name for ${curName}:`, curName);
+        if (!newName || !newName.trim() || newName.trim() === curName) return;
+        try {
+          const newState = await apiRequest("/api/users/manage", "POST", {
+            action: "rename_user",
+            user_id: uid,
+            display_name: newName.trim(),
+          });
+          updateState(newState, true);
+          showToast(`Renamed to ${newName.trim()}!`);
+        } catch (err) {
+          showToast(err.message);
+        }
+      });
+    });
+
     listEl.querySelectorAll(".btn-toggle-editor").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const uid = Number(btn.getAttribute("data-user-id"));
@@ -1287,7 +1928,7 @@ function renderPeopleAndPrivileges() {
       btn.addEventListener("click", async () => {
         const uid = Number(btn.getAttribute("data-user-id"));
         const uname = btn.getAttribute("data-user-name");
-        if (!confirm(`Remove ${uname}'s account and their dish assignments?`)) return;
+        if (!confirm(`Remove ${uname}'s account and their assignments?`)) return;
         try {
           const newState = await apiRequest("/api/users/manage", "POST", {
             action: "delete_user",
@@ -1303,13 +1944,12 @@ function renderPeopleAndPrivileges() {
   }
 }
 
-// =====================================================================
-// SUBTAB 2: WHO'S SORTING WHAT ROSTER
-// =====================================================================
 function renderHousematesRoster() {
   const container = document.getElementById("housemates-grid");
   const users = appState.users || [];
   const dishes = appState.dishes || [];
+  const meatPoll = appState.meat_poll || { options: [], votes: [] };
+  const drinks = appState.drinks || [];
 
   const claimsByUser = {};
   dishes.forEach((d) => {
@@ -1319,14 +1959,29 @@ function renderHousematesRoster() {
         dishTitle: d.title,
         category: d.category,
         status: c.status,
-        note: c.note,
       });
+    });
+  });
+
+  const meatVoteByUser = {};
+  (meatPoll.votes || []).forEach((v) => {
+    const opt = (meatPoll.options || []).find((o) => o.id === v.choice);
+    if (opt) meatVoteByUser[v.user_id] = `${opt.emoji} ${opt.label}`;
+  });
+
+  const drinkByUser = {};
+  drinks.forEach((dr) => {
+    (dr.drinkers || []).forEach((p) => {
+      drinkByUser[p.user_id] = `${dr.emoji} ${dr.name}`;
     });
   });
 
   container.innerHTML = users
     .map((u) => {
       const userClaims = claimsByUser[u.id] || [];
+      const userMeat = meatVoteByUser[u.id] || "No vote yet";
+      const userDrink = drinkByUser[u.id] || "No drink selected";
+
       return `
         <div class="housemate-card">
           <div class="housemate-header">
@@ -1347,6 +2002,12 @@ function renderHousematesRoster() {
               <span class="housemate-handle">@${escapeHtml(u.username)} • Sorting ${userClaims.length} ${userClaims.length === 1 ? "dish" : "dishes"}</span>
             </div>
           </div>
+
+          <div style="display:flex; flex-direction:column; gap:0.4rem; margin-bottom:0.75rem; font-size:0.84rem;">
+            <div><strong>🥩 Meat Vote:</strong> ${escapeHtml(userMeat)}</div>
+            <div><strong>🍷 Drink Choice:</strong> ${escapeHtml(userDrink)}</div>
+          </div>
+
           <div class="housemate-claims-list">
             ${
               userClaims.length === 0
@@ -1395,6 +2056,9 @@ function setActiveView(viewName) {
     tab.classList.toggle("active", tab.getAttribute("data-view") === viewName);
   });
   document.getElementById("view-dishes").classList.toggle("hidden", viewName !== "dishes");
+  document.getElementById("view-recipes").classList.toggle("hidden", viewName !== "recipes");
+  document.getElementById("view-meat").classList.toggle("hidden", viewName !== "meat");
+  document.getElementById("view-drinks").classList.toggle("hidden", viewName !== "drinks");
   document.getElementById("view-housemates").classList.toggle("hidden", viewName !== "housemates");
   document.getElementById("view-admin").classList.toggle("hidden", viewName !== "admin");
 }
@@ -1414,7 +2078,6 @@ function updateState(newState, forceRender = false) {
   }
   appState = newState;
 
-  // Don't interrupt user typing inside an input/textarea during background polling
   const activeEl = document.activeElement;
   if (
     !forceRender &&
@@ -1422,10 +2085,13 @@ function updateState(newState, forceRender = false) {
     (activeEl.classList.contains("claim-note-input") ||
       activeEl.classList.contains("recipe-url-input") ||
       activeEl.classList.contains("manual-recipe-title") ||
+      activeEl.classList.contains("manual-recipe-servings") ||
       activeEl.classList.contains("manual-recipe-prep") ||
       activeEl.classList.contains("manual-recipe-cook") ||
       activeEl.classList.contains("manual-recipe-desc") ||
       activeEl.classList.contains("manual-recipe-ings") ||
+      activeEl.id === "new-drink-name" ||
+      activeEl.id === "new-drink-notes" ||
       activeEl.tagName === "SELECT")
   ) {
     return;
@@ -1448,11 +2114,9 @@ async function fetchState(forceRender = false) {
 }
 
 function initEventListeners() {
-  // Auth tabs
   document.getElementById("tab-login").addEventListener("click", () => switchAuthTab("login"));
   document.getElementById("tab-register").addEventListener("click", () => switchAuthTab("register"));
 
-  // Login submit
   document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const username = document.getElementById("login-username").value.trim();
@@ -1466,7 +2130,6 @@ function initEventListeners() {
     }
   });
 
-  // Register submit
   document.getElementById("register-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const display_name = document.getElementById("reg-display-name").value.trim();
@@ -1491,7 +2154,6 @@ function initEventListeners() {
     }
   });
 
-  // Logout
   document.getElementById("logout-btn").addEventListener("click", async () => {
     try {
       const state = await apiRequest("/api/logout", "POST");
@@ -1503,27 +2165,23 @@ function initEventListeners() {
     }
   });
 
-  // Main navigation tabs
   document.querySelectorAll(".main-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       setActiveView(tab.getAttribute("data-view"));
     });
   });
 
-  // Subtabs inside People & Privileges
   document.querySelectorAll(".subtab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       setActivePeopleSubtab(btn.getAttribute("data-subtab"));
     });
   });
 
-  // Toggle quick presets drawer
   document.getElementById("toggle-presets-btn").addEventListener("click", () => {
     const drawer = document.getElementById("quick-presets-drawer");
     drawer.classList.toggle("hidden");
   });
 
-  // Add custom dish form (Admin & Dish Editors)
   document.getElementById("add-dish-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const titleInput = document.getElementById("new-dish-title");
@@ -1543,6 +2201,68 @@ function initEventListeners() {
       spotsInput.value = "1";
       updateState(newState, true);
       showToast("Added dish to the 82 Harrow Christmas Dinner list!");
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
+
+  // Live AI Emoji preview when typing a drink option
+  const drinkNameInput = document.getElementById("new-drink-name");
+  const drinkNotesInput = document.getElementById("new-drink-notes");
+  const updateLiveDrinkEmoji = () => {
+    const emoji = selectDrinkEmojiClient(drinkNameInput.value, drinkNotesInput.value);
+    document.getElementById("drink-live-emoji").textContent = emoji;
+  };
+  drinkNameInput.addEventListener("input", updateLiveDrinkEmoji);
+  drinkNotesInput.addEventListener("input", updateLiveDrinkEmoji);
+
+  // Add Drink Option form (Everyone)
+  document.getElementById("add-drink-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = drinkNameInput.value.trim();
+    const notes = drinkNotesInput.value.trim();
+    if (!name) return;
+    try {
+      const newState = await apiRequest("/api/drinks/add", "POST", { name, notes });
+      drinkNameInput.value = "";
+      drinkNotesInput.value = "";
+      updateLiveDrinkEmoji();
+      updateState(newState, true);
+      showToast("🥂 Uploaded drink option!");
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
+
+  // Admin Override for Meat Poll
+  document.getElementById("btn-admin-set-meat-vote").addEventListener("click", async () => {
+    const uid = Number(document.getElementById("admin-meat-user-select").value);
+    const choice = document.getElementById("admin-meat-choice-select").value;
+    if (!uid) return;
+    try {
+      const newState = await apiRequest("/api/meat_poll/vote", "POST", {
+        user_id: uid,
+        choice,
+      });
+      updateState(newState, true);
+      showToast("Updated housemate's meat vote!");
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
+
+  // Admin Override for Drink Selection
+  document.getElementById("btn-admin-set-drink").addEventListener("click", async () => {
+    const uid = Number(document.getElementById("admin-drink-user-select").value);
+    const dval = document.getElementById("admin-drink-choice-select").value;
+    if (!uid) return;
+    try {
+      const newState = await apiRequest("/api/drinks/select", "POST", {
+        user_id: uid,
+        drink_id: dval === "clear" ? "clear" : Number(dval),
+      });
+      updateState(newState, true);
+      showToast("Updated housemate's drink selection!");
     } catch (err) {
       showToast(err.message);
     }
@@ -1579,7 +2299,6 @@ function initEventListeners() {
     }
   });
 
-  // Category filter pills
   document.querySelectorAll(".filter-pill").forEach((pill) => {
     pill.addEventListener("click", () => {
       activeFilter = pill.getAttribute("data-filter");
@@ -1589,13 +2308,11 @@ function initEventListeners() {
     });
   });
 
-  // Search box
   document.getElementById("dish-search-input").addEventListener("input", (e) => {
     searchQuery = e.target.value.trim();
     renderDishesList();
   });
 
-  // Admin Settings Form
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {

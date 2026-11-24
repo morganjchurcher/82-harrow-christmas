@@ -45,7 +45,7 @@
         </div>
         <div class="form-group">
           <label for="edit-dish-notes">Notes / Details (optional)</label>
-          <input type="text" id="edit-dish-notes" placeholder="e.g. Enough for 8 people, vegetarian option" />
+          <input type="text" id="edit-dish-notes" placeholder="e.g. Enough for 7 people, vegetarian option" />
         </div>
         <div class="modal-actions">
           <button type="button" id="cancel-edit-dish" class="btn btn-secondary">Cancel</button>
@@ -61,7 +61,7 @@
       <div class="auth-brand">
         <span class="house-pill">🏠 82 HARROW • UNI HOUSE</span>
         <h1>🎄 Christmas Dinner</h1>
-        <p class="auth-subtitle">Log in to your account to see the Christmas dinner list, click "Assign to me", and view or add recipes.</p>
+        <p class="auth-subtitle">Log in to your account to see the Christmas dinner list, click "Assign to me", vote in the Meat Poll, and pick your Drinks.</p>
       </div>
 
       <!-- Morgan / First User Admin Setup Banner -->
@@ -162,9 +162,9 @@
           </div>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Still Needs Sorting</span>
-          <strong id="stat-unclaimed-spots" class="stat-value text-gold">0</strong>
-          <span class="stat-sub">Waiting for someone</span>
+          <span class="stat-label">Est. Cost Each (÷7)</span>
+          <strong id="stat-cost-each" class="stat-value text-gold">£0.00</strong>
+          <span id="stat-total-cost-sub" class="stat-sub">£0.00 total recipe cost</span>
         </div>
         <div class="stat-card">
           <span class="stat-label">Sorted By You</span>
@@ -176,13 +176,22 @@
       <!-- Main View Navigation Tabs -->
       <nav class="main-tabs" aria-label="Dashboard sections">
         <button type="button" class="main-tab active" data-view="dishes">
-          🍽️ Christmas Dinner Dishes <span id="tab-count-dishes" class="tab-pill">0</span>
+          🍽️ Dishes <span id="tab-count-dishes" class="tab-pill">0</span>
+        </button>
+        <button type="button" class="main-tab" data-view="recipes">
+          🛒 Recipe List &amp; Costs <span id="tab-count-recipes" class="tab-pill">0</span>
+        </button>
+        <button type="button" class="main-tab" data-view="meat">
+          🥩 Meat Poll <span id="tab-count-meat" class="tab-pill">0</span>
+        </button>
+        <button type="button" class="main-tab" data-view="drinks">
+          🍷 Drinks <span id="tab-count-drinks" class="tab-pill">0</span>
         </button>
         <button type="button" class="main-tab" data-view="housemates">
           👥 People &amp; Privileges <span id="tab-count-housemates" class="tab-pill">0</span>
         </button>
         <button type="button" id="admin-settings-tab" class="main-tab hidden" data-view="admin">
-          ⚙️ Event Settings
+          ⚙️ Settings
         </button>
       </nav>
 
@@ -215,7 +224,7 @@
                   type="text"
                   id="new-dish-title"
                   required
-                  placeholder="e.g. Roast Turkey, Crispy Roast Potatoes, Pigs in Blankets, Gravy..."
+                  placeholder="e.g. Roast Chicken, Crispy Roast Potatoes, Pigs in Blankets, Gravy..."
                 />
               </div>
               <div class="form-group">
@@ -239,7 +248,7 @@
                 <input
                   type="text"
                   id="new-dish-notes"
-                  placeholder="Optional note (e.g. 'Enough for 8 people', 'Veggie friendly', 'Needs big roasting tin')"
+                  placeholder="Optional note (e.g. 'Enough for 7 people', 'Veggie friendly', 'Needs big roasting tin')"
                 />
               </div>
               <button type="submit" class="btn btn-primary">
@@ -278,15 +287,187 @@
         <div id="dishes-container" class="dishes-list"></div>
       </section>
 
-      <!-- VIEW 2: PEOPLE & PRIVILEGES (WITH SUBTABS) -->
+      <!-- VIEW 2: COMPILED RECIPE LIST & 7-PERSON UK SUPERMARKET COSTS -->
+      <section id="view-recipes" class="view-section hidden">
+        <div class="section-intro">
+          <h2>🛒 Compiled Recipe Ingredient List (Scaled for 7 People)</h2>
+          <p>
+            Automatically compiles all ingredients from every dish's attached Recipe URL, scales the quantities for <strong>7 people at 82 Harrow</strong>, and estimates average UK supermarket costs (£).
+          </p>
+        </div>
+
+        <div id="recipes-empty-state" class="empty-state hidden">
+          <div class="empty-icon">📖</div>
+          <h3>No recipe URLs attached to dishes yet</h3>
+          <p>Go to the <strong>🍽️ Dishes</strong> tab, click on any dish to expand it, and paste a recipe URL (e.g. BBC Good Food, Tesco, Jamie Oliver) to populate this master shopping &amp; cost list!</p>
+        </div>
+
+        <div id="recipes-compiled-wrapper" class="recipes-compiled-wrapper hidden">
+          <div class="compiled-table-card">
+            <div class="compiled-table-header">
+              <div>
+                <h3>📋 Master Ingredient &amp; Cost Breakdown (For 7 People)</h3>
+                <p id="compiled-table-subtitle" class="settings-desc" style="margin-bottom:0;">
+                  Quantities are scaled from each recipe's serving size to 7 people.
+                </p>
+              </div>
+              <span class="house-pill">🇬🇧 Avg. UK Supermarket Prices</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="compiled-table">
+                <thead>
+                  <tr>
+                    <th>Dish / Recipe</th>
+                    <th>Sorted By</th>
+                    <th>Ingredient</th>
+                    <th>Amount for 7 People</th>
+                    <th>Est. UK Cost (£)</th>
+                    <th id="compiled-admin-col" class="hidden">Admin Edit</th>
+                  </tr>
+                </thead>
+                <tbody id="compiled-ingredients-tbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Total Cost & Split-by-7 Footer Banner -->
+            <div class="cost-summary-footer">
+              <div class="cost-summary-box">
+                <span class="cost-summary-label">Total Estimated Cost (All Recipes)</span>
+                <strong id="recipe-grand-total" class="cost-summary-value">£0.00</strong>
+                <span id="recipe-total-items-count" class="cost-summary-sub">0 ingredients across 0 recipes</span>
+              </div>
+              <div class="cost-divider">÷ 7</div>
+              <div class="cost-summary-box cost-each-highlight">
+                <span class="cost-summary-label">Total Cost Each (Split 7 Ways)</span>
+                <strong id="recipe-cost-per-person" class="cost-summary-value">£0.00</strong>
+                <span class="cost-summary-sub">Per person at 82 Harrow (Total ÷ 7)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: MEAT POLL (PRIMARY CHICKEN + SECONDARY MEAT PIE CHART) -->
+      <section id="view-meat" class="view-section hidden">
+        <!-- Non-Negotiable Primary Meat Banner -->
+        <div class="primary-meat-banner">
+          <div class="primary-meat-icon">🍗</div>
+          <div class="primary-meat-text">
+            <span class="primary-meat-tag">🔒 PRIMARY MEAT • NON-NEGOTIABLE</span>
+            <h2>Roast Chicken is Locked In!</h2>
+            <p>Chicken is our non-negotiable 82 Harrow primary meat. Everyone gets <strong>1 vote</strong> below to decide our <strong>Secondary Meat</strong>!</p>
+          </div>
+        </div>
+
+        <div class="meat-poll-grid">
+          <!-- Left: Voting Options -->
+          <div class="meat-options-card">
+            <div class="meat-card-header">
+              <h3>🗳️ Cast Your Secondary Meat Vote</h3>
+              <p class="settings-desc">Click an option below to vote (you can switch your vote anytime).</p>
+            </div>
+            <div id="meat-options-list" class="meat-options-list"></div>
+
+            <!-- Admin Override Box for Morgan -->
+            <div id="admin-meat-override" class="admin-override-box hidden">
+              <h4>👑 Administrator Control — Edit Anyone's Meat Vote</h4>
+              <div class="admin-override-row">
+                <select id="admin-meat-user-select"></select>
+                <select id="admin-meat-choice-select">
+                  <option value="gammon">🍖 Gammon</option>
+                  <option value="beef">🥩 Roast Beef</option>
+                  <option value="lamb">🐑 Roast Lamb</option>
+                  <option value="pork">🐖 Roast Pork (&amp; Crackling)</option>
+                  <option value="beef_wellington">🥐 Beef Wellington (Ambitious)</option>
+                  <option value="clear">✕ Clear Vote</option>
+                </select>
+                <button type="button" id="btn-admin-set-meat-vote" class="btn btn-secondary btn-sm">
+                  Save Vote
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Live Pie Chart -->
+          <div class="meat-chart-card">
+            <div class="meat-card-header">
+              <h3>📊 Live Secondary Meat Pie Chart</h3>
+              <p id="meat-total-votes-label" class="settings-desc">0 votes cast so far</p>
+            </div>
+            <div class="pie-chart-container">
+              <canvas id="meat-pie-canvas" width="300" height="300"></canvas>
+            </div>
+            <div id="meat-chart-legend" class="meat-chart-legend"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: DRINKS BOARD (EVERYONE UPLOADS + AI EMOJI + 1 DRINK SELECTION) -->
+      <section id="view-drinks" class="view-section hidden">
+        <!-- Upload Drink Option Card (Available to EVERYONE) -->
+        <div class="drinks-creator-card">
+          <div class="creator-header">
+            <div>
+              <span class="house-pill" style="margin-bottom:0.3rem;">🥂 OPEN TO EVERYONE</span>
+              <h2>Add a Drink Option to the 82 Harrow Bar</h2>
+              <p>Everyone can upload drink options! Once added, pick which drink you're having (and switch anytime). Each drink automatically gets an AI-matched emoji.</p>
+            </div>
+          </div>
+
+          <form id="add-drink-form" class="add-drink-form">
+            <div class="drink-input-row">
+              <div class="drink-emoji-preview-box" title="AI-matched drink emoji">
+                <span id="drink-live-emoji">🍹</span>
+              </div>
+              <input
+                type="text"
+                id="new-drink-name"
+                required
+                placeholder="Type a drink (e.g. Mulled Wine, Prosecco, Guinness, Baileys, Cider, Gin & Tonic, Diet Coke)..."
+              />
+              <input
+                type="text"
+                id="new-drink-notes"
+                placeholder="Optional note (e.g. 'Crate of 12', 'Served warm with orange slices')"
+              />
+              <button type="submit" class="btn btn-primary">
+                + Upload Drink Option
+              </button>
+            </div>
+          </form>
+
+          <!-- Admin Override for Drinks (Morgan) -->
+          <div id="admin-drink-override" class="admin-override-box hidden" style="margin-top:1rem;">
+            <h4>👑 Administrator Control — Edit Anyone's Drink Selection</h4>
+            <div class="admin-override-row">
+              <select id="admin-drink-user-select"></select>
+              <select id="admin-drink-choice-select"></select>
+              <button type="button" id="btn-admin-set-drink" class="btn btn-secondary btn-sm">
+                Update Selection
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="drinks-empty-state" class="empty-state hidden">
+          <div class="empty-icon">🥂</div>
+          <h3>No drink options uploaded yet</h3>
+          <p>Be the first to upload a drink option above!</p>
+        </div>
+
+        <div id="drinks-grid" class="drinks-grid"></div>
+      </section>
+
+      <!-- VIEW 5: PEOPLE & PRIVILEGES (WITH SUBTABS) -->
       <section id="view-housemates" class="view-section hidden">
         <!-- Subtabs inside People & Privileges -->
         <div class="subtabs-bar">
           <button type="button" id="subtab-btn-privileges" class="subtab-btn active" data-subtab="privileges">
-            👑 People &amp; Privileges (Admin &amp; Dish Editors)
+            👑 People &amp; Privileges (Edit Names, Dish Editors &amp; Admins)
           </button>
           <button type="button" id="subtab-btn-roster" class="subtab-btn" data-subtab="roster">
-            🏠 Who's Sorting What (Dish Roster)
+            🏠 Full House Summary (Dishes, Meat Vote &amp; Drink)
           </button>
         </div>
 
@@ -295,7 +476,7 @@
           <div class="section-intro">
             <h2>👑 Logged-In People &amp; Privileges</h2>
             <p id="privileges-subtitle">
-              See everyone who has logged into the 82 Harrow dashboard. As Administrator, you can grant anyone <strong>Dish Editor Privileges</strong> (so they can add dishes to the Christmas dinner component list) or full <strong>Administrator Privileges</strong>.
+              See everyone who has logged into the 82 Harrow dashboard. As Administrator, you can edit anyone's name, grant <strong>Dish Editor Privileges</strong>, or grant <strong>Administrator Privileges</strong>.
             </p>
           </div>
           <div id="privileges-people-list" class="privileges-list"></div>
@@ -304,14 +485,14 @@
         <!-- SUBTAB 2: WHO'S SORTING WHAT ROSTER -->
         <div id="subtab-roster" class="subtab-panel hidden">
           <div class="section-intro">
-            <h2>🏠 Who's Sorting What at 82 Harrow</h2>
-            <p>See every housemate and the Christmas dinner dishes they've assigned to themselves.</p>
+            <h2>🏠 82 Harrow Housemate Overview</h2>
+            <p>See every housemate's assigned dishes, secondary meat vote, and chosen drink in one place.</p>
           </div>
           <div id="housemates-grid" class="housemates-grid"></div>
         </div>
       </section>
 
-      <!-- VIEW 3: EVENT SETTINGS (ADMIN ONLY) -->
+      <!-- VIEW 6: EVENT SETTINGS (ADMIN ONLY) -->
       <section id="view-admin" class="view-section hidden">
         <div class="settings-card" style="max-width: 680px;">
           <h3>🎄 Event Details &amp; House Notice</h3>

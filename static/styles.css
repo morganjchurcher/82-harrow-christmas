@@ -1502,3 +1502,484 @@ body {
     flex-direction: column;
   }
 }
+
+
+/* =========================================================
+   VIEW 2: COMPILED RECIPE LIST & 7-PERSON COST TABLE
+   ========================================================= */
+.compiled-table-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 1.35rem;
+  box-shadow: var(--shadow-md);
+}
+
+.compiled-table-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.15rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1.5px solid var(--bg-subtle);
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.compiled-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.compiled-table th {
+  text-align: left;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.77rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.72rem 0.9rem;
+  border-bottom: 2px solid var(--border-warm);
+}
+
+.compiled-table td {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--bg-subtle);
+  vertical-align: middle;
+}
+
+.compiled-table tr:hover td {
+  background: rgba(243, 237, 224, 0.45);
+}
+
+.amount-7-badge {
+  display: inline-block;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-border);
+  color: #6b4803;
+  font-weight: 700;
+  font-size: 0.83rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.cost-gbp-cell {
+  font-weight: 800;
+  color: var(--green-primary);
+  font-size: 0.95rem;
+}
+
+.cost-summary-footer {
+  margin-top: 1.35rem;
+  background: linear-gradient(135deg, #123120 0%, #1b462f 100%);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: 1.35rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-around;
+  gap: 1.25rem;
+  border: 2px solid #c58b18;
+  box-shadow: var(--shadow-md);
+}
+
+.cost-summary-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cost-summary-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #cce0d3;
+}
+
+.cost-summary-value {
+  font-size: 2.15rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0.15rem 0;
+}
+
+.cost-each-highlight .cost-summary-value {
+  color: #f7ce68;
+}
+
+.cost-summary-sub {
+  font-size: 0.8rem;
+  color: #b7cfc0;
+}
+
+.cost-divider {
+  font-size: 1.65rem;
+  font-weight: 900;
+  color: #f7ce68;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 206, 104, 0.35);
+}
+
+/* =========================================================
+   VIEW 3: MEAT POLL & PIE CHART
+   ========================================================= */
+.primary-meat-banner {
+  background: linear-gradient(135deg, #fffdf6 0%, #fef4d7 100%);
+  border: 2.5px solid #d49b24;
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.35rem;
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.primary-meat-icon {
+  font-size: 2.9rem;
+  background: #fff;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--gold-border);
+  flex-shrink: 0;
+}
+
+.primary-meat-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: var(--red-primary);
+  color: #fff;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  margin-bottom: 0.3rem;
+}
+
+.primary-meat-text h2 {
+  font-size: 1.35rem;
+  color: var(--text-main);
+}
+
+.primary-meat-text p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.meat-poll-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 1.25rem;
+}
+
+.meat-options-card,
+.meat-chart-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 1.35rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.meat-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.meat-option-btn {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 2px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.05rem;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.meat-option-btn:hover {
+  border-color: var(--green-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.meat-option-btn.my-meat-vote {
+  background: var(--green-soft);
+  border-color: var(--green-primary);
+}
+
+.meat-option-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.meat-option-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.meat-emoji-big {
+  font-size: 1.55rem;
+}
+
+.meat-vote-count-pill {
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--text-main);
+}
+
+.meat-option-btn.my-meat-vote .meat-vote-count-pill {
+  background: var(--green-primary);
+  color: #fff;
+}
+
+.meat-voters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.voter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-warm);
+  padding: 0.14rem 0.52rem;
+  border-radius: 999px;
+}
+
+.pie-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.85rem 0 1.15rem;
+}
+
+.meat-chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.48rem;
+}
+
+.legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.legend-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* =========================================================
+   VIEW 4: DRINKS BOARD
+   ========================================================= */
+.drinks-creator-card {
+  background: var(--bg-card);
+  border: 2px solid var(--gold-border);
+  border-radius: var(--radius-md);
+  padding: 1.3rem;
+  margin-bottom: 1.35rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.drink-input-row {
+  display: grid;
+  grid-template-columns: 54px 1.6fr 1.2fr auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.drink-emoji-preview-box {
+  width: 54px;
+  height: 46px;
+  border-radius: var(--radius-sm);
+  background: var(--gold-soft);
+  border: 1.5px solid var(--gold-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.65rem;
+}
+
+.drink-input-row input {
+  padding: 0.68rem 0.85rem;
+  font-size: 0.94rem;
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-sm);
+}
+
+.drinks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.05rem;
+}
+
+.drink-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 1.2rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.95rem;
+}
+
+.drink-card.my-drink-choice {
+  border-color: var(--green-primary);
+  border-width: 2px;
+  background: #f5fcf8;
+}
+
+.drink-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.drink-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.drink-emoji-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.85rem;
+  flex-shrink: 0;
+}
+
+.drink-name {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.drink-notes {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.drinkers-box {
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-warm);
+}
+
+.drinkers-box-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.drinkers-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Admin Override Box */
+.admin-override-box {
+  margin-top: 1.15rem;
+  padding: 0.9rem 1rem;
+  background: var(--gold-soft);
+  border: 1.5px dashed var(--gold-border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-override-box h4 {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #5c3f04;
+  margin-bottom: 0.55rem;
+}
+
+.admin-override-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-override-row select {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid var(--gold-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 860px) {
+  .meat-poll-grid {
+    grid-template-columns: 1fr;
+  }
+  .drink-input-row {
+    grid-template-columns: 54px 1fr;
+  }
+  .drink-input-row #new-drink-notes,
+  .drink-input-row button {
+    grid-column: 1 / -1;
+  }
+}
