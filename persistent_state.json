@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T13:08:25.386252",
+  "updated_at": "2026-11-25T13:33:49.379997",
   "tables": {
     "users": [
       {
@@ -50,6 +50,18 @@
         "avatar_color": "#8e44ad",
         "created_at": "2026-11-25T13:08:25.379017",
         "last_login_at": "2026-11-25T13:08:25.379017"
+      },
+      {
+        "id": 5,
+        "username": "steero",
+        "display_name": "henry",
+        "password_hash": "da58ddf0d21a2f242d3072a0c2edc6b1148d1f841ab5b9a10928fcc0ee7cd109",
+        "password_salt": "b284e4124410e13a1d0bf4bfe4a485ba",
+        "role": "housemate",
+        "can_edit_dishes": 0,
+        "avatar_color": "#2980b9",
+        "created_at": "2026-11-25T13:33:49.372719",
+        "last_login_at": "2026-11-25T13:33:49.372719"
       }
     ],
     "sessions": [
@@ -77,6 +89,11 @@
         "token": "BdKkhSzD06PcjpPSbU6ksl1fLWf_qFwdyUSBlT-18zY",
         "user_id": 4,
         "created_at": 1795612105
+      },
+      {
+        "token": "SNqSkI-jHrsmLyzO7n_I07ZRZP85W0EpD0-FAJleuKU",
+        "user_id": 5,
+        "created_at": 1795613629
       }
     ],
     "dishes": [
