@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T11:57:43.545127",
+  "updated_at": "2026-11-25T11:59:13.797561",
   "tables": {
     "users": [
       {
@@ -80,6 +80,26 @@
         "recipe_added_by": "Morgan",
         "recipe_servings": 8,
         "recipe_custom_items": "[{\"ingredient\": \"Brussels sprouts (loose outer leaves removed)\", \"original_text\": \"1 kg Brussels sprouts (loose outer leaves removed)\", \"amount_for_7\": \"0.88 kg\", \"estimated_cost_gbp\": 2.4}, {\"ingredient\": \"olive oil\", \"original_text\": \"1 tbsp olive oil\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 0.65}, {\"ingredient\": \"bacon (thick slices, diced)\", \"original_text\": \"200 g bacon (thick slices, diced)\", \"amount_for_7\": \"175 g\", \"estimated_cost_gbp\": 2.4}, {\"ingredient\": \"walnuts (roughly chopped)\", \"original_text\": \"150 g walnuts (roughly chopped)\", \"amount_for_7\": \"130 g\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"lemon zest\", \"original_text\": \"1 tbsp lemon zest\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 0.6}, {\"ingredient\": \"lemon juice\", \"original_text\": \"1 tbsp lemon juice\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 0.6}, {\"ingredient\": \"sea salt (to season)\", \"original_text\": \"sea salt (to season)\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"black pepper (to season)\", \"original_text\": \"black pepper (to season)\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}]"
+      },
+      {
+        "id": 3,
+        "title": "Crispy Roast Potatoes",
+        "category": "Sides & Trimmings",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 3,
+        "created_by": 1,
+        "created_at": "2026-11-25T11:59:13.794583",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
       }
     ],
     "claims": [
