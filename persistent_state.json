@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T11:57:25.492625",
+  "updated_at": "2026-11-25T11:57:29.576303",
   "tables": {
     "users": [
       {
@@ -113,6 +113,15 @@
         "created_by": 1,
         "created_by_name": "Morgan",
         "created_at": "2026-11-25T11:57:23.618849"
+      },
+      {
+        "id": 2,
+        "name": "Beer",
+        "emoji": "\ud83c\udf7a",
+        "notes": "",
+        "created_by": 1,
+        "created_by_name": "Morgan",
+        "created_at": "2026-11-25T11:57:29.572111"
       }
     ],
     "drink_selections": [
