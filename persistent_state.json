@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:25:49.754245",
+  "updated_at": "2026-11-25T12:25:53.348264",
   "tables": {
     "users": [
       {
@@ -264,6 +264,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:25:49.746940"
+      },
+      {
+        "canonical_key": "duck_goose_fat",
+        "store_tier": "butcher",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:53.340929"
       }
     ],
     "settings": [
