@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:19.127438",
+  "updated_at": "2026-11-25T12:26:28.434025",
   "tables": {
     "users": [
       {
@@ -312,6 +312,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:26:19.120625"
+      },
+      {
+        "canonical_key": "butter",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:28.425303"
       }
     ],
     "settings": [
