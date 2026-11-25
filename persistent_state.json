@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:27:23.847956",
+  "updated_at": "2026-11-25T12:27:33.058259",
   "tables": {
     "users": [
       {
@@ -292,6 +292,15 @@
         "created_by": 1,
         "created_by_name": "Morgan",
         "created_at": "2026-11-25T11:57:43.541666"
+      },
+      {
+        "id": 4,
+        "name": "Gin & Tonic",
+        "emoji": "\ud83c\udf78",
+        "notes": "",
+        "created_by": 3,
+        "created_by_name": "C.C.O",
+        "created_at": "2026-11-25T12:27:33.052179"
       }
     ],
     "drink_selections": [
