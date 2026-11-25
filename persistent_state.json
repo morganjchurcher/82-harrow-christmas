@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:59.108739",
+  "updated_at": "2026-11-25T12:27:08.186620",
   "tables": {
     "users": [
       {
@@ -373,6 +373,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:26:28.425303"
+      },
+      {
+        "canonical_key": "honey",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:08.179739"
       }
     ],
     "settings": [
