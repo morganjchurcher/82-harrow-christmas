@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:38.746717",
+  "updated_at": "2026-11-25T12:26:55.504411",
   "tables": {
     "users": [
       {
@@ -197,6 +197,26 @@
         "recipe_added_by": "Morgan",
         "recipe_servings": 4,
         "recipe_custom_items": "[{\"ingredient\": \"pork sausages\", \"original_text\": \"6 pork sausages\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 3.0}, {\"ingredient\": \"small rosemary sprigs\", \"original_text\": \"6 small rosemary sprigs\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 1.0}, {\"ingredient\": \"smoked streaky bacon rashers\", \"original_text\": \"6 smoked streaky bacon rashers\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 2.4}, {\"ingredient\": \"sunflower or vegetable oil\", \"original_text\": \"1 tbsp sunflower or vegetable oil\", \"amount_for_7\": \"2 tbsp\", \"estimated_cost_gbp\": 0.65}]"
+      },
+      {
+        "id": 8,
+        "title": "Braised Red Cabbage",
+        "category": "Sides & Trimmings",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 8,
+        "created_by": 3,
+        "created_at": "2026-11-25T12:26:55.497672",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
       }
     ],
     "claims": [
