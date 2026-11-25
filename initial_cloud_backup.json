@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updated_at": "2026-11-25T12:05:08.639176",
+  "version": 2,
+  "updated_at": "2026-11-25T12:33:15.697966",
   "tables": {
     "users": [
       {
@@ -26,6 +26,18 @@
         "avatar_color": "#1e824c",
         "created_at": "2026-11-24T22:43:23.947343",
         "last_login_at": "2026-11-24T22:43:23.947343"
+      },
+      {
+        "id": 3,
+        "username": "chates",
+        "display_name": "C.C.O",
+        "password_hash": "85d4d763b0dff83d30e5dd88b0dade38dd7a8b407bacc17f3a7738e64bcd4fa9",
+        "password_salt": "1688b520ad6f63287ceaa41e135090b0",
+        "role": "housemate",
+        "can_edit_dishes": 1,
+        "avatar_color": "#d35400",
+        "created_at": "2026-11-25T12:26:29.717831",
+        "last_login_at": "2026-11-25T12:26:29.717831"
       }
     ],
     "sessions": [
@@ -38,6 +50,11 @@
         "token": "tFKRTMXs_zevtKq9BuM5bvVDWnZavte9XCl8RVIemkM",
         "user_id": 2,
         "created_at": 1795560203
+      },
+      {
+        "token": "Hc8syF9Lt7xwnbvUR4glbbLWCPipQYZgqJphzZoBpz4",
+        "user_id": 3,
+        "created_at": 1795609589
       }
     ],
     "dishes": [
@@ -180,6 +197,46 @@
         "recipe_added_by": "Morgan",
         "recipe_servings": 4,
         "recipe_custom_items": "[{\"ingredient\": \"pork sausages\", \"original_text\": \"6 pork sausages\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 3.0}, {\"ingredient\": \"small rosemary sprigs\", \"original_text\": \"6 small rosemary sprigs\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 1.0}, {\"ingredient\": \"smoked streaky bacon rashers\", \"original_text\": \"6 smoked streaky bacon rashers\", \"amount_for_7\": \"11\", \"estimated_cost_gbp\": 2.4}, {\"ingredient\": \"sunflower or vegetable oil\", \"original_text\": \"1 tbsp sunflower or vegetable oil\", \"amount_for_7\": \"2 tbsp\", \"estimated_cost_gbp\": 0.65}]"
+      },
+      {
+        "id": 8,
+        "title": "Braised Red Cabbage",
+        "category": "Sides & Trimmings",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 8,
+        "created_by": 3,
+        "created_at": "2026-11-25T12:26:55.497672",
+        "recipe_url": "https://www.dailymail.com/lifestyle/food-drink/article-9006661/Marco-Pierre-White-shares-delicious-recipes-hes-dreamed-specially-you.html",
+        "recipe_title": "Marco Pierre White shares the delicious recipes he's dreamed up specially for you | Daily Mail Online",
+        "recipe_description": "Marco said braised red cabbage is the perfect accompaniment for roast turkey \n\nA perfect accompaniment to roast turkey (and other roast birds such as partridge, above).",
+        "recipe_prep_time": "15",
+        "recipe_cook_time": "60",
+        "recipe_ingredients": "[\"1 small red cabbage\", \"150ml (\\u00bcpt) white wine vinegar\", \"250g (9oz) caster sugar\", \"50g (1\\u00beoz) currants\", \"1 apple, peeled and coarsely grated\", \"1 small cinnamon stick\", \"150ml (\\u00bcpt) water\", \"Salt and freshly ground black pepper\"]",
+        "recipe_image": "",
+        "recipe_added_by": "Morgan",
+        "recipe_servings": 9,
+        "recipe_custom_items": "[{\"ingredient\": \"small red cabbage\", \"original_text\": \"1 small red cabbage\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.4}, {\"ingredient\": \"( \\u00bcpt) white wine vinegar\", \"original_text\": \"150ml (\\u00bcpt) white wine vinegar\", \"amount_for_7\": \"115 ml\", \"estimated_cost_gbp\": 2.75}, {\"ingredient\": \"(9oz) caster sugar\", \"original_text\": \"250g (9oz) caster sugar\", \"amount_for_7\": \"195 g\", \"estimated_cost_gbp\": 1.15}, {\"ingredient\": \"(1 \\u00beoz) currants\", \"original_text\": \"50g (1\\u00beoz) currants\", \"amount_for_7\": \"40 g\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"apple, peeled and coarsely grated\", \"original_text\": \"1 apple, peeled and coarsely grated\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"small cinnamon stick\", \"original_text\": \"1 small cinnamon stick\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"( \\u00bcpt) water\", \"original_text\": \"150ml (\\u00bcpt) water\", \"amount_for_7\": \"115 ml\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"Salt and freshly ground black pepper\", \"original_text\": \"Salt and freshly ground black pepper\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}]"
+      },
+      {
+        "id": 9,
+        "title": "Radio Rylan",
+        "category": "Cleanup & Kitchen Roles",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 9,
+        "created_by": 3,
+        "created_at": "2026-11-25T12:28:49.973450",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
       }
     ],
     "claims": [
@@ -198,6 +255,46 @@
         "note": "",
         "status": "claimed",
         "claimed_at": "2026-11-25T12:00:48.365081"
+      },
+      {
+        "id": 3,
+        "dish_id": 7,
+        "user_id": 3,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:26:38.739084"
+      },
+      {
+        "id": 4,
+        "dish_id": 8,
+        "user_id": 3,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:26:59.101484"
+      },
+      {
+        "id": 5,
+        "dish_id": 6,
+        "user_id": 1,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:30:16.986681"
+      },
+      {
+        "id": 6,
+        "dish_id": 4,
+        "user_id": 2,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:30:38.477626"
+      },
+      {
+        "id": 7,
+        "dish_id": 5,
+        "user_id": 2,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:30:43.398094"
       }
     ],
     "meat_votes": [
@@ -210,6 +307,11 @@
         "user_id": 2,
         "choice": "beef_wellington",
         "voted_at": "2026-11-24T22:43:40.074300"
+      },
+      {
+        "user_id": 3,
+        "choice": "lamb",
+        "voted_at": "2026-11-25T12:27:59.643116"
       }
     ],
     "drinks": [
@@ -239,6 +341,15 @@
         "created_by": 1,
         "created_by_name": "Morgan",
         "created_at": "2026-11-25T11:57:43.541666"
+      },
+      {
+        "id": 4,
+        "name": "Gin & Tonic",
+        "emoji": "\ud83c\udf78",
+        "notes": "",
+        "created_by": 3,
+        "created_by_name": "C.C.O",
+        "created_at": "2026-11-25T12:27:33.052179"
       }
     ],
     "drink_selections": [
@@ -246,6 +357,117 @@
         "user_id": 1,
         "drink_id": 1,
         "selected_at": "2026-11-25T11:57:25.488691"
+      },
+      {
+        "user_id": 3,
+        "drink_id": 4,
+        "selected_at": "2026-11-25T12:27:35.833978"
+      }
+    ],
+    "ingredient_preferences": [
+      {
+        "canonical_key": "pork_sausagemeat",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:43.325390"
+      },
+      {
+        "canonical_key": "whole_chicken",
+        "store_tier": "butcher",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:49.746940"
+      },
+      {
+        "canonical_key": "duck_goose_fat",
+        "store_tier": "butcher",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:53.340929"
+      },
+      {
+        "canonical_key": "pork_sausages",
+        "store_tier": "premium",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:01.234453"
+      },
+      {
+        "canonical_key": "garlic",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:11.210958"
+      },
+      {
+        "canonical_key": "lemons",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:13.236145"
+      },
+      {
+        "canonical_key": "onions",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:17.600708"
+      },
+      {
+        "canonical_key": "oranges",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:19.120625"
+      },
+      {
+        "canonical_key": "butter",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:28.425303"
+      },
+      {
+        "canonical_key": "honey",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:08.179739"
+      },
+      {
+        "canonical_key": "breadcrumbs",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:11.616200"
+      },
+      {
+        "canonical_key": "flour",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:17.817659"
+      },
+      {
+        "canonical_key": "veg_sunflower_oil",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:23.838759"
       }
     ],
     "settings": [

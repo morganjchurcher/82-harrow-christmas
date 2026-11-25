@@ -145,16 +145,28 @@
     <!-- Top Header -->
     <header class="top-header">
       <div class="header-inner">
-        <div class="brand-cluster">
-          <div class="brand-badges">
-            <span class="house-badge">🏠 82 HARROW</span>
-            <span id="event-datetime-badge" class="datetime-badge">📅 December 2026 • 7:00 PM</span>
-            <span class="sync-badge" title="Updates automatically across all housemates' devices">
-              <span class="sync-dot"></span> Live Sync
-            </span>
+        <div class="header-brand-with-mascot">
+          <figure class="mascot-badge" title="Hungry Chates, the 82 Harrow Christmas Dinner Official Mascot">
+            <div class="mascot-img-wrap">
+              <img src="/hungry-chates.png?v=3" alt="Hungry Chates, the 82 Harrow Christmas Dinner Official Mascot" class="mascot-img" />
+            </div>
+            <figcaption class="mascot-caption">
+              <strong>Hungry Chates</strong>
+              <span>the 82 Harrow Christmas Dinner Official Mascot</span>
+            </figcaption>
+          </figure>
+
+          <div class="brand-cluster">
+            <div class="brand-badges">
+              <span class="house-badge">🏠 82 HARROW</span>
+              <span id="event-datetime-badge" class="datetime-badge">📅 December 2026 • 7:00 PM</span>
+              <span class="sync-badge" title="Updates automatically across all housemates' devices">
+                <span class="sync-dot"></span> Live Sync
+              </span>
+            </div>
+            <h1 id="header-event-title">82 Harrow Christmas Dinner 🎄</h1>
+            <p id="header-announcement" class="announcement-text"></p>
           </div>
-          <h1 id="header-event-title">82 Harrow Christmas Dinner 🎄</h1>
-          <p id="header-announcement" class="announcement-text"></p>
         </div>
 
         <div class="user-cluster">
@@ -429,11 +441,25 @@
               <div class="admin-override-row">
                 <select id="admin-meat-user-select"></select>
                 <select id="admin-meat-choice-select">
-                  <option value="gammon">🍖 Gammon</option>
-                  <option value="beef">🥩 Roast Beef</option>
-                  <option value="lamb">🐑 Roast Lamb</option>
-                  <option value="pork">🐖 Roast Pork (&amp; Crackling)</option>
-                  <option value="beef_wellington">🥐 Beef Wellington (Ambitious)</option>
+                  <optgroup label="Single Secondary Meat">
+                    <option value="gammon">🍖 Gammon</option>
+                    <option value="beef">🥩 Roast Beef</option>
+                    <option value="lamb">🐑 Roast Lamb</option>
+                    <option value="pork">🐖 Roast Pork (&amp; Crackling)</option>
+                    <option value="beef_wellington">🥐 Beef Wellington (Ambitious)</option>
+                  </optgroup>
+                  <optgroup label="Trio of Meats (Chicken + Secondary Meat Duo)">
+                    <option value="trio_gammon_beef">🍖🥩 Trio: Gammon &amp; Beef</option>
+                    <option value="trio_gammon_lamb">🍖🐑 Trio: Gammon &amp; Lamb</option>
+                    <option value="trio_gammon_pork">🍖🐖 Trio: Gammon &amp; Pork</option>
+                    <option value="trio_gammon_wellington">🍖🥐 Trio: Gammon &amp; Wellington</option>
+                    <option value="trio_beef_lamb">🥩🐑 Trio: Beef &amp; Lamb</option>
+                    <option value="trio_beef_pork">🥩🐖 Trio: Beef &amp; Pork</option>
+                    <option value="trio_beef_wellington">🥩🥐 Trio: Beef &amp; Wellington</option>
+                    <option value="trio_pork_lamb">🐖🐑 Trio: Pork &amp; Lamb</option>
+                    <option value="trio_lamb_wellington">🐑🥐 Trio: Lamb &amp; Wellington</option>
+                    <option value="trio_pork_wellington">🐖🥐 Trio: Pork &amp; Wellington</option>
+                  </optgroup>
                   <option value="clear">✕ Clear Vote</option>
                 </select>
                 <button type="button" id="btn-admin-set-meat-vote" class="btn btn-secondary btn-sm">

@@ -59,13 +59,29 @@ AVATAR_COLORS = [
     "#a93226",  # Cinnamon
 ]
 
-MEAT_POLL_OPTIONS = [
-    {"id": "gammon", "label": "Gammon", "emoji": "🍖", "color": "#d9534f"},
-    {"id": "beef", "label": "Roast Beef", "emoji": "🥩", "color": "#8b261d"},
-    {"id": "lamb", "label": "Roast Lamb", "emoji": "🐑", "color": "#2e8b57"},
-    {"id": "pork", "label": "Roast Pork (& Crackling)", "emoji": "🐖", "color": "#e67e22"},
-    {"id": "beef_wellington", "label": "Beef Wellington (Ambitious)", "emoji": "🥐", "color": "#8e44ad"},
+SINGLE_MEAT_OPTIONS = [
+    {"id": "gammon", "label": "Gammon", "emoji": "🍖", "color": "#d9534f", "is_trio": False},
+    {"id": "beef", "label": "Roast Beef", "emoji": "🥩", "color": "#8b261d", "is_trio": False},
+    {"id": "lamb", "label": "Roast Lamb", "emoji": "🐑", "color": "#2e8b57", "is_trio": False},
+    {"id": "pork", "label": "Roast Pork (& Crackling)", "emoji": "🐖", "color": "#e67e22", "is_trio": False},
+    {"id": "beef_wellington", "label": "Beef Wellington (Ambitious)", "emoji": "🥐", "color": "#8e44ad", "is_trio": False},
 ]
+
+TRIO_MEAT_COLOR = "#d4a017"  # Shared gold colour in pie chart for all Trio of Meats categories
+TRIO_MEAT_OPTIONS = [
+    {"id": "trio_gammon_beef", "label": "Trio: Gammon & Beef", "duo_label": "Gammon & Roast Beef", "emoji": "🍖🥩", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_gammon_lamb", "label": "Trio: Gammon & Lamb", "duo_label": "Gammon & Roast Lamb", "emoji": "🍖🐑", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_gammon_pork", "label": "Trio: Gammon & Pork", "duo_label": "Gammon & Roast Pork", "emoji": "🍖🐖", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_gammon_wellington", "label": "Trio: Gammon & Wellington", "duo_label": "Gammon & Beef Wellington", "emoji": "🍖🥐", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_beef_lamb", "label": "Trio: Beef & Lamb", "duo_label": "Roast Beef & Roast Lamb", "emoji": "🥩🐑", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_beef_pork", "label": "Trio: Beef & Pork", "duo_label": "Roast Beef & Roast Pork", "emoji": "🥩🐖", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_beef_wellington", "label": "Trio: Beef & Wellington", "duo_label": "Roast Beef & Beef Wellington", "emoji": "🥩🥐", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_pork_lamb", "label": "Trio: Pork & Lamb", "duo_label": "Roast Pork & Roast Lamb", "emoji": "🐖🐑", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_lamb_wellington", "label": "Trio: Lamb & Wellington", "duo_label": "Roast Lamb & Beef Wellington", "emoji": "🐑🥐", "color": TRIO_MEAT_COLOR, "is_trio": True},
+    {"id": "trio_pork_wellington", "label": "Trio: Pork & Wellington", "duo_label": "Roast Pork & Beef Wellington", "emoji": "🐖🥐", "color": TRIO_MEAT_COLOR, "is_trio": True},
+]
+
+MEAT_POLL_OPTIONS = SINGLE_MEAT_OPTIONS + TRIO_MEAT_OPTIONS
 VALID_MEAT_IDS = {m["id"] for m in MEAT_POLL_OPTIONS}
 
 

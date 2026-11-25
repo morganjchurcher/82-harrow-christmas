@@ -2098,3 +2098,152 @@ body {
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+
+
+/* =========================================================
+   HUNGRY CHATES OFFICIAL MASCOT HEADER BADGE
+   ========================================================= */
+.header-brand-with-mascot {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex: 1 1 560px;
+}
+
+.mascot-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(243, 198, 95, 0.28) 0%, rgba(15, 38, 25, 0.75) 100%);
+  border: 2px solid #f3c65f;
+  border-radius: 16px;
+  padding: 0.45rem 0.65rem 0.5rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+  max-width: 148px;
+  text-align: center;
+}
+
+.mascot-img-wrap {
+  width: 92px;
+  height: 112px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.mascot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.mascot-caption {
+  margin-top: 0.3rem;
+  line-height: 1.2;
+}
+
+.mascot-caption strong {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #f7ce68;
+}
+
+.mascot-caption span {
+  display: block;
+  font-size: 0.64rem;
+  color: #dce7df;
+  font-weight: 500;
+}
+
+/* =========================================================
+   TRIO OF MEATS OPTION & SECONDARY DUO DROPDOWN
+   ========================================================= */
+.trio-meat-card {
+  width: 100%;
+  text-align: left;
+  background: linear-gradient(135deg, #fffdf7 0%, #fef6df 100%);
+  border: 2px solid #e1be63;
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1.05rem;
+  transition: all 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.trio-meat-card.my-meat-vote {
+  background: linear-gradient(135deg, #fef9e8 0%, #faecc4 100%);
+  border-color: #b8820e;
+  box-shadow: 0 4px 14px rgba(197, 139, 24, 0.22);
+}
+
+.trio-trigger-btn {
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.trio-dropdown-drawer {
+  background: #fff;
+  border: 1.5px solid #e1be63;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.trio-dropdown-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.trio-duo-select {
+  flex: 1;
+  min-width: 210px;
+  padding: 0.55rem 0.75rem;
+  border: 1.5px solid #d4a017;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: #fffdf8;
+  color: #3d2800;
+  cursor: pointer;
+}
+
+.trio-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.trio-breakdown-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid #ead49b;
+  border-radius: 8px;
+  padding: 0.38rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 620px) {
+  .header-brand-with-mascot {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1689,8 +1689,10 @@ function exportShoppingListAsCsv() {
 }
 
 // =====================================================================
-// VIEW 3: MEAT POLL & LIVE PIE CHART
+// VIEW 3: MEAT POLL (INCLUDING 'TRIO OF MEATS' DUO DROPDOWN) & LIVE PIE CHART
 // =====================================================================
+let trioDrawerManuallyOpen = false;
+
 function renderMeatPoll() {
   const user = appState.current_user;
   const isAdmin = user.role === "admin";
@@ -1699,8 +1701,12 @@ function renderMeatPoll() {
   const votes = poll.votes || [];
   const users = appState.users || [];
 
+  const singleOptions = options.filter((o) => !o.is_trio);
+  const trioOptions = options.filter((o) => o.is_trio);
+
   const myVoteObj = votes.find((v) => v.user_id === user.id);
   const myChoice = myVoteObj ? myVoteObj.choice : null;
+  const myVoteIsTrio = Boolean(myChoice && myChoice.startsWith("trio_"));
 
   const votesByOption = {};
   options.forEach((o) => {
@@ -1712,8 +1718,12 @@ function renderMeatPoll() {
     }
   });
 
-  const listEl = document.getElementById("meat-options-list");
-  listEl.innerHTML = options
+  // Total votes across all Trio of Meats duo categories
+  const allTrioVotes = votes.filter((v) => (v.choice || "").startsWith("trio_"));
+  const totalTrioPct = votes.length > 0 ? Math.round((allTrioVotes.length / votes.length) * 100) : 0;
+  const showTrioDrawer = trioDrawerManuallyOpen || myVoteIsTrio;
+
+  const singleHtml = singleOptions
     .map((opt) => {
       const optVotes = votesByOption[opt.id] || [];
       const isMine = myChoice === opt.id;
@@ -1761,11 +1771,103 @@ function renderMeatPoll() {
     })
     .join("");
 
+  // Active Trio of Meats breakdown by specific duo category
+  const activeTrioCategoriesHtml = trioOptions
+    .filter((tOpt) => (votesByOption[tOpt.id] || []).length > 0)
+    .map((tOpt) => {
+      const tVotes = votesByOption[tOpt.id] || [];
+      const tPct = votes.length > 0 ? Math.round((tVotes.length / votes.length) * 100) : 0;
+      return `
+        <div class="trio-breakdown-item">
+          <div>
+            <strong>${tOpt.emoji} ${escapeHtml(tOpt.label)}</strong>
+            <span style="font-size:0.75rem; color:var(--text-muted); margin-left:0.35rem;">(${tVotes.length} vote${tVotes.length === 1 ? "" : "s"}, ${tPct}%)</span>
+          </div>
+          <div class="meat-voters-row">
+            ${tVotes
+              .map(
+                (v) => `
+                  <span class="voter-chip">
+                    <span class="avatar avatar-sm" style="width:18px;height:18px;font-size:0.62rem;background-color:${escapeHtml(v.avatar_color)}">
+                      ${escapeHtml(getInitials(v.display_name))}
+                    </span>
+                    ${escapeHtml(v.display_name)}${v.user_id === user.id ? " (You)" : ""}
+                  </span>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const selectedDuoId = myVoteIsTrio
+    ? myChoice
+    : trioOptions[0]
+    ? trioOptions[0].id
+    : "trio_gammon_beef";
+
+  const trioCardHtml = `
+    <div class="trio-meat-card ${myVoteIsTrio ? "my-meat-vote" : ""}">
+      <button type="button" id="btn-toggle-trio-drawer" class="trio-trigger-btn">
+        <div class="meat-option-top">
+          <div class="meat-option-title">
+            <span class="meat-emoji-big">🍗🍖🥩</span>
+            <div>
+              <span>Trio of Meats (Pick a Secondary Meat Duo!)</span>
+              <span style="display:block; font-size:0.76rem; font-weight:500; color:var(--text-muted);">
+                Roast Chicken + any 2 Secondary Meats • Click to choose your duo
+              </span>
+            </div>
+            ${myVoteIsTrio ? '<span class="priv-pill priv-pill-admin">✓ Your Trio Vote</span>' : ""}
+          </div>
+          <span class="meat-vote-count-pill">
+            ${allTrioVotes.length} Trio vote${allTrioVotes.length === 1 ? "" : "s"} (${totalTrioPct}%) ▾
+          </span>
+        </div>
+      </button>
+
+      <div id="trio-dropdown-drawer" class="trio-dropdown-drawer ${showTrioDrawer ? "" : "hidden"}">
+        <label for="trio-duo-select-input" style="font-size:0.82rem; font-weight:700; color:#5c3f04;">
+          Choose your Secondary Meat Duo (alongside Chicken):
+        </label>
+        <div class="trio-dropdown-row">
+          <select id="trio-duo-select-input" class="trio-duo-select">
+            ${trioOptions
+              .map(
+                (tOpt) => `
+                  <option value="${tOpt.id}" ${tOpt.id === selectedDuoId ? "selected" : ""}>
+                    ${tOpt.emoji} ${escapeHtml(tOpt.duo_label || tOpt.label)} (+ 🍗 Chicken)
+                  </option>
+                `
+              )
+              .join("")}
+          </select>
+          <button type="button" id="btn-confirm-trio-vote" class="btn btn-primary btn-sm">
+            🗳️ Select This Trio
+          </button>
+        </div>
+      </div>
+
+      ${
+        activeTrioCategoriesHtml
+          ? `<div class="trio-breakdown-list">${activeTrioCategoriesHtml}</div>`
+          : ""
+      }
+    </div>
+  `;
+
+  const listEl = document.getElementById("meat-options-list");
+  listEl.innerHTML = singleHtml + trioCardHtml;
+
+  // Single meat vote click
   listEl.querySelectorAll(".meat-option-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const choice = btn.getAttribute("data-meat-choice");
       try {
         btn.disabled = true;
+        trioDrawerManuallyOpen = false;
         const newState = await apiRequest("/api/meat_poll/vote", "POST", { choice });
         updateState(newState, true);
         showToast("🗳️ Secondary meat vote recorded!");
@@ -1775,6 +1877,40 @@ function renderMeatPoll() {
       }
     });
   });
+
+  // Trio drawer toggle
+  const toggleTrioBtn = document.getElementById("btn-toggle-trio-drawer");
+  if (toggleTrioBtn) {
+    toggleTrioBtn.addEventListener("click", () => {
+      trioDrawerManuallyOpen = !showTrioDrawer;
+      renderMeatPoll();
+    });
+  }
+
+  // Trio dropdown change or confirm button immediately casts vote for that Trio duo!
+  const trioSelect = document.getElementById("trio-duo-select-input");
+  const confirmTrioBtn = document.getElementById("btn-confirm-trio-vote");
+  const submitTrioChoice = async () => {
+    if (!trioSelect || !trioSelect.value) return;
+    try {
+      if (confirmTrioBtn) confirmTrioBtn.disabled = true;
+      const newState = await apiRequest("/api/meat_poll/vote", "POST", {
+        choice: trioSelect.value,
+      });
+      updateState(newState, true);
+      const chosenOpt = trioOptions.find((o) => o.id === trioSelect.value);
+      showToast(`🍗Voted for ${chosenOpt ? chosenOpt.label : "Trio of Meats"}!`);
+    } catch (err) {
+      showToast(err.message);
+      if (confirmTrioBtn) confirmTrioBtn.disabled = false;
+    }
+  };
+  if (trioSelect) {
+    trioSelect.addEventListener("change", submitTrioChoice);
+  }
+  if (confirmTrioBtn) {
+    confirmTrioBtn.addEventListener("click", submitTrioChoice);
+  }
 
   // Admin Override Box for Morgan
   const adminBox = document.getElementById("admin-meat-override");
@@ -1842,31 +1978,38 @@ function drawMeatPieChart(options, votesByOption, totalVotes) {
       ctx.moveTo(cx, cy);
       ctx.arc(cx, cy, radius, startAngle, endAngle);
       ctx.closePath();
+      // Note: All Trio of Meats categories share the same Royal Gold colour (#d4a017) for easy quick-look,
+      // while still being drawn as distinct category slices with white borders!
       ctx.fillStyle = opt.color;
       ctx.fill();
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Draw emoji + percentage inside slice
       const midAngle = startAngle + sliceAngle / 2;
       const labelR = totalVotes === count ? 0 : radius * 0.62;
       const lx = cx + Math.cos(midAngle) * labelR;
       const ly = cy + Math.sin(midAngle) * labelR;
       const pct = Math.round((count / totalVotes) * 100);
 
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillStyle = opt.is_trio ? "#2b1d00" : "#ffffff";
+      ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`${opt.emoji} ${pct}%`, lx, ly);
+      const sliceLabel = opt.is_trio ? `${opt.emoji} ${pct}%` : `${opt.emoji} ${pct}%`;
+      ctx.fillText(sliceLabel, lx, ly);
 
       startAngle = endAngle;
     });
   }
 
-  // Render Legend
-  legendEl.innerHTML = options
+  // Render Legend: show all 5 single meats + any Trio of Meats duo category that has votes
+  // (plus a general Trio of Meats row if 0 Trio votes exist yet)
+  const singleOpts = options.filter((o) => !o.is_trio);
+  const votedTrioOpts = options.filter((o) => o.is_trio && (votesByOption[o.id] || []).length > 0);
+
+  const legendItems = [...singleOpts, ...votedTrioOpts];
+  let legendHtml = legendItems
     .map((opt) => {
       const count = (votesByOption[opt.id] || []).length;
       const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
@@ -1881,6 +2024,20 @@ function drawMeatPieChart(options, votesByOption, totalVotes) {
       `;
     })
     .join("");
+
+  if (votedTrioOpts.length === 0) {
+    legendHtml += `
+      <div class="legend-row">
+        <div class="legend-left">
+          <span class="legend-swatch" style="background-color: #d4a017"></span>
+          <span>🍗🍖🥩 Trio of Meats (Any Secondary Duo)</span>
+        </div>
+        <strong>0 votes (0%)</strong>
+      </div>
+    `;
+  }
+
+  legendEl.innerHTML = legendHtml;
 }
 
 // =====================================================================
