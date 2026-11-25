@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T11:57:29.576303",
+  "updated_at": "2026-11-25T11:57:43.545127",
   "tables": {
     "users": [
       {
@@ -122,6 +122,15 @@
         "created_by": 1,
         "created_by_name": "Morgan",
         "created_at": "2026-11-25T11:57:29.572111"
+      },
+      {
+        "id": 3,
+        "name": "Cricsoc Fizz",
+        "emoji": "\ud83e\udd42",
+        "notes": "",
+        "created_by": 1,
+        "created_by_name": "Morgan",
+        "created_at": "2026-11-25T11:57:43.541666"
       }
     ],
     "drink_selections": [
