@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:30:38.484897",
+  "updated_at": "2026-11-25T12:30:43.405253",
   "tables": {
     "users": [
       {
@@ -287,6 +287,14 @@
         "note": "",
         "status": "claimed",
         "claimed_at": "2026-11-25T12:30:38.477626"
+      },
+      {
+        "id": 7,
+        "dish_id": 5,
+        "user_id": 2,
+        "note": "",
+        "status": "claimed",
+        "claimed_at": "2026-11-25T12:30:43.398094"
       }
     ],
     "meat_votes": [
