@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T11:55:56.742689",
+  "updated_at": "2026-11-25T11:56:54.575958",
   "tables": {
     "users": [
       {
@@ -60,6 +60,26 @@
         "recipe_added_by": "Morgan",
         "recipe_servings": 6,
         "recipe_custom_items": "[{\"ingredient\": \"/ 3lb whole chicken\", \"original_text\": \"1.5 kg / 3lb whole chicken\", \"amount_for_7\": \"1.75 kg\", \"estimated_cost_gbp\": 6.75}, {\"ingredient\": \"cup softened butter\", \"original_text\": \"\\u00bd cup softened butter\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 2.15}, {\"ingredient\": \"zest of 1 orange\", \"original_text\": \"zest of 1 orange\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"zest of 1 lemon\", \"original_text\": \"zest of 1 lemon\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"garlic cloves (finely minced/crushed )\", \"original_text\": \"2 garlic cloves (finely minced/crushed )\", \"amount_for_7\": \"3\", \"estimated_cost_gbp\": 0.75}, {\"ingredient\": \"sage (finely chopped)\", \"original_text\": \"1 tbsp sage (finely chopped)\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"thyme leaves\", \"original_text\": \"2 tsp thyme leaves\", \"amount_for_7\": \"2.5 tsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"salt\", \"original_text\": \"1 tsp salt\", \"amount_for_7\": \"1 tsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"pepper\", \"original_text\": \"\\u00bd tsp pepper\", \"amount_for_7\": \"0.5 tsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"olive oil\", \"original_text\": \"2 tbsp olive oil\", \"amount_for_7\": \"2.5 tbsp\", \"estimated_cost_gbp\": 0.65}, {\"ingredient\": \"salt and pepper (to taste )\", \"original_text\": \"salt and pepper (to taste )\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"oranges (halved)\", \"original_text\": \"2 oranges (halved)\", \"amount_for_7\": \"3\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"onion (quartered)\", \"original_text\": \"1 onion (quartered)\", \"amount_for_7\": \"2\", \"estimated_cost_gbp\": 1.1}, {\"ingredient\": \"garlic bulbs (halved )\", \"original_text\": \"2 garlic bulbs (halved )\", \"amount_for_7\": \"3\", \"estimated_cost_gbp\": 0.75}, {\"ingredient\": \"fresh thyme\", \"original_text\": \"10 sprigs fresh thyme\", \"amount_for_7\": \"12 sprigs\", \"estimated_cost_gbp\": 1.0}, {\"ingredient\": \"sage leaves\", \"original_text\": \"6 sage leaves\", \"amount_for_7\": \"7\", \"estimated_cost_gbp\": 1.0}, {\"ingredient\": \"cup white wine\", \"original_text\": \"1 cup white wine\", \"amount_for_7\": \"2\", \"estimated_cost_gbp\": 6.5}]"
+      },
+      {
+        "id": 2,
+        "title": "Sprouts with Bacon & Walnuts",
+        "category": "Sides & Trimmings",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 2,
+        "created_by": 1,
+        "created_at": "2026-11-25T11:56:54.526299",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
       }
     ],
     "claims": [],
