@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T12:00:48.371787",
+  "updated_at": "2026-11-25T12:01:58.506953",
   "tables": {
     "users": [
       {
@@ -140,6 +140,26 @@
         "recipe_added_by": "Morgan",
         "recipe_servings": 8,
         "recipe_custom_items": "[{\"ingredient\": \"parsnips\", \"original_text\": \"500g parsnips\", \"amount_for_7\": \"440 g\", \"estimated_cost_gbp\": 1.3}, {\"ingredient\": \"flour\", \"original_text\": \"1 tbsp flour\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"honey\", \"original_text\": \"1 tbsp honey\", \"amount_for_7\": \"1 tbsp\", \"estimated_cost_gbp\": 1.85}, {\"ingredient\": \"sunflower oil\", \"original_text\": \"2 tbsp sunflower oil\", \"amount_for_7\": \"2 tbsp\", \"estimated_cost_gbp\": 0.65}, {\"ingredient\": \"butter\", \"original_text\": \"2 tbsp butter\", \"amount_for_7\": \"2 tbsp\", \"estimated_cost_gbp\": 0.65}]"
+      },
+      {
+        "id": 6,
+        "title": "Sage and Onion meaty Stuffing Balls",
+        "category": "Sides & Trimmings",
+        "notes": "",
+        "max_claims": 1,
+        "sort_order": 6,
+        "created_by": 1,
+        "created_at": "2026-11-25T12:01:58.492917",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
       }
     ],
     "claims": [
