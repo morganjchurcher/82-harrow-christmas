@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:40:32.383402",
+  "updated_at": "2026-11-25T12:40:34.176789",
   "tables": {
     "users": [
       {
@@ -311,7 +311,7 @@
       {
         "user_id": 2,
         "choice": "trio_gammon_beef",
-        "voted_at": "2026-11-25T12:40:32.376528"
+        "voted_at": "2026-11-25T12:40:34.169934"
       },
       {
         "user_id": 3,
