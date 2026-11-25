@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:41:05.073689",
+  "updated_at": "2026-11-25T13:08:25.386252",
   "tables": {
     "users": [
       {
@@ -38,6 +38,18 @@
         "avatar_color": "#d35400",
         "created_at": "2026-11-25T12:26:29.717831",
         "last_login_at": "2026-11-25T12:26:29.717831"
+      },
+      {
+        "id": 4,
+        "username": "storey",
+        "display_name": "Storey",
+        "password_hash": "382d0138b47ac9598833d92ae43a8bb3fc1c475d4ccd557d4d0cea81ed5bb185",
+        "password_salt": "b92ba142df8bf5e69a11b0f1175e9323",
+        "role": "housemate",
+        "can_edit_dishes": 0,
+        "avatar_color": "#8e44ad",
+        "created_at": "2026-11-25T13:08:25.379017",
+        "last_login_at": "2026-11-25T13:08:25.379017"
       }
     ],
     "sessions": [
@@ -60,6 +72,11 @@
         "token": "fCIzBjHqC328y8pgbXs-CZkgM1UofEnuXkboaHGeUKU",
         "user_id": 1,
         "created_at": 1795610426
+      },
+      {
+        "token": "BdKkhSzD06PcjpPSbU6ksl1fLWf_qFwdyUSBlT-18zY",
+        "user_id": 4,
+        "created_at": 1795612105
       }
     ],
     "dishes": [
