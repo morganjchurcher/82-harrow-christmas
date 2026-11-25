@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:28.434025",
+  "updated_at": "2026-11-25T12:26:29.724553",
   "tables": {
     "users": [
       {
@@ -26,6 +26,18 @@
         "avatar_color": "#1e824c",
         "created_at": "2026-11-24T22:43:23.947343",
         "last_login_at": "2026-11-24T22:43:23.947343"
+      },
+      {
+        "id": 3,
+        "username": "chates",
+        "display_name": "C.C.O",
+        "password_hash": "85d4d763b0dff83d30e5dd88b0dade38dd7a8b407bacc17f3a7738e64bcd4fa9",
+        "password_salt": "1688b520ad6f63287ceaa41e135090b0",
+        "role": "housemate",
+        "can_edit_dishes": 0,
+        "avatar_color": "#d35400",
+        "created_at": "2026-11-25T12:26:29.717831",
+        "last_login_at": "2026-11-25T12:26:29.717831"
       }
     ],
     "sessions": [
@@ -38,6 +50,11 @@
         "token": "tFKRTMXs_zevtKq9BuM5bvVDWnZavte9XCl8RVIemkM",
         "user_id": 2,
         "created_at": 1795560203
+      },
+      {
+        "token": "Hc8syF9Lt7xwnbvUR4glbbLWCPipQYZgqJphzZoBpz4",
+        "user_id": 3,
+        "created_at": 1795609589
       }
     ],
     "dishes": [
