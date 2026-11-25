@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:25:43.335340",
+  "updated_at": "2026-11-25T12:25:49.754245",
   "tables": {
     "users": [
       {
@@ -256,6 +256,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:25:43.325390"
+      },
+      {
+        "canonical_key": "whole_chicken",
+        "store_tier": "butcher",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:49.746940"
       }
     ],
     "settings": [
