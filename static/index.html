@@ -317,9 +317,9 @@
       <!-- VIEW 2: COMPILED RECIPE LIST & 7-PERSON UK SUPERMARKET COSTS -->
       <section id="view-recipes" class="view-section hidden">
         <div class="section-intro">
-          <h2>🛒 Compiled Recipe Ingredient List (Scaled for 7 People)</h2>
+          <h2>🛒 Grouped Master Shopping List &amp; Costs (For 7 People)</h2>
           <p>
-            Automatically compiles all ingredients from every dish's attached Recipe URL, scales the quantities for <strong>7 people at 82 Harrow</strong>, and estimates average UK supermarket costs (£).
+            Automatically groups identical ingredients across all recipes, quantifies the <strong>total combined amount needed for 7 people</strong>, and adjusts prices based on where you choose to buy each item.
           </p>
         </div>
 
@@ -333,23 +333,29 @@
           <div class="compiled-table-card">
             <div class="compiled-table-header">
               <div>
-                <h3>📋 Master Ingredient &amp; Cost Breakdown (For 7 People)</h3>
+                <h3>📋 Grouped Ingredient &amp; Establishment Cost Breakdown (For 7 People)</h3>
                 <p id="compiled-table-subtitle" class="settings-desc" style="margin-bottom:0;">
-                  Quantities are scaled from each recipe's serving size to 7 people.
+                  Same ingredients from different recipes are combined into a single total quantity. Choose where to buy each item in the dropdown on the right!
                 </p>
               </div>
-              <span class="house-pill">🇬🇧 Avg. UK Supermarket Prices</span>
+              <div class="bulk-store-bar">
+                <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Quick-set all to:</span>
+                <button type="button" class="btn btn-secondary btn-sm btn-bulk-store" data-store="budget">💷 Budget (Aldi/Lidl)</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-bulk-store" data-store="normal">🛒 Normal (Sainsbury's)</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-bulk-store" data-store="premium">✨ Premium (M&amp;S)</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-bulk-store" data-store="butcher">🔪 Butchers (Rossiter's)</button>
+              </div>
             </div>
 
             <div class="table-responsive">
               <table class="compiled-table">
                 <thead>
                   <tr>
-                    <th>Dish / Recipe</th>
-                    <th>Sorted By</th>
-                    <th>Ingredient</th>
-                    <th>Amount for 7 People</th>
-                    <th>Est. UK Cost (£)</th>
+                    <th>Grouped Ingredient</th>
+                    <th>Used In Recipes (7-Person Breakdown)</th>
+                    <th>Total Amount Needed (For 7)</th>
+                    <th>Est. Cost (£)</th>
+                    <th>Where to Buy</th>
                     <th id="compiled-admin-col" class="hidden">Admin Edit</th>
                   </tr>
                 </thead>
@@ -357,18 +363,39 @@
               </table>
             </div>
 
+            <!-- Store Subtotals Breakdown Strip -->
+            <div id="store-subtotals-strip" class="store-subtotals-strip"></div>
+
             <!-- Total Cost & Split-by-7 Footer Banner -->
             <div class="cost-summary-footer">
               <div class="cost-summary-box">
-                <span class="cost-summary-label">Total Estimated Cost (All Recipes)</span>
+                <span class="cost-summary-label">Total Estimated Cost (All Grouped Items)</span>
                 <strong id="recipe-grand-total" class="cost-summary-value">£0.00</strong>
-                <span id="recipe-total-items-count" class="cost-summary-sub">0 ingredients across 0 recipes</span>
+                <span id="recipe-total-items-count" class="cost-summary-sub">0 grouped items across 0 recipes</span>
               </div>
               <div class="cost-divider">÷ 7</div>
               <div class="cost-summary-box cost-each-highlight">
                 <span class="cost-summary-label">Total Cost Each (Split 7 Ways)</span>
                 <strong id="recipe-cost-per-person" class="cost-summary-value">£0.00</strong>
                 <span class="cost-summary-sub">Per person at 82 Harrow (Total ÷ 7)</span>
+              </div>
+            </div>
+
+            <!-- Export as Table (PDF Shopping List & CSV) Bar -->
+            <div class="export-actions-bar">
+              <div>
+                <strong>📄 Ready for the 82 Harrow Big Shop?</strong>
+                <p style="font-size:0.83rem; color:var(--text-muted); margin:0;">
+                  Export a clean, quick-look shopping list table with tick boxes, grouped 7-person quantities, store assignments, and costs.
+                </p>
+              </div>
+              <div class="export-buttons-group">
+                <button type="button" id="btn-export-pdf-table" class="btn btn-primary">
+                  📄 Export as Table (PDF Shopping List)
+                </button>
+                <button type="button" id="btn-export-csv-table" class="btn btn-secondary">
+                  📊 Download CSV Spreadsheet
+                </button>
               </div>
             </div>
           </div>

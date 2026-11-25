@@ -381,13 +381,14 @@ function renderDashboard() {
     }
   }
 
-  // Compute Stats & Recipe Total Cost
+  // Compute Stats & Grouped Recipe Total Cost
   const totalDishes = dishes.length;
   let totalSpots = 0;
   let claimedSpots = 0;
   let myClaimsCount = 0;
   let totalRecipeCostGbp = 0;
-  let compiledIngredientCount = 0;
+  const groupedList = appState.grouped_shopping_list || [];
+  const compiledIngredientCount = groupedList.length;
 
   dishes.forEach((d) => {
     const claimsCount = (d.claims || []).length;
@@ -396,10 +397,10 @@ function renderDashboard() {
     if ((d.claims || []).some((c) => c.user_id === user.id)) {
       myClaimsCount += 1;
     }
-    (d.compiled_ingredients || []).forEach((item) => {
-      compiledIngredientCount += 1;
-      totalRecipeCostGbp += Number(item.estimated_cost_gbp || 0);
-    });
+  });
+
+  groupedList.forEach((item) => {
+    totalRecipeCostGbp += Number(item.estimated_cost_gbp || 0);
   });
 
   const costEachGbp = totalRecipeCostGbp / HOUSE_SIZE;
@@ -1155,17 +1156,33 @@ function attachDishListListeners() {
 }
 
 // =====================================================================
-// VIEW 2: COMPILED RECIPE LIST & 7-PERSON UK SUPERMARKET COSTS
+// VIEW 2: GROUPED RECIPE SHOPPING LIST, STORE DROPDOWNS & PDF/CSV EXPORT
 // =====================================================================
+const STORE_TIER_LABELS = {
+  normal: "🛒 Normal (e.g. Sainsbury's)",
+  premium: "✨ Premium (e.g. M&S)",
+  budget: "💷 Budget (e.g. Aldi/Lidl)",
+  butcher: "🔪 Local Butchers (e.g. Rossiter's)",
+};
+
+const STORE_TIER_CLEAN_NAMES = {
+  normal: "Normal (e.g. Sainsbury's)",
+  premium: "Premium (e.g. M&S)",
+  budget: "Budget (e.g. Aldi/Lidl)",
+  butcher: "Local Butchers (e.g. Rossiter's)",
+};
+
 function renderCompiledRecipesList() {
   const user = appState.current_user;
   const isAdmin = user.role === "admin";
   const dishes = appState.dishes || [];
+  const groupedList = appState.grouped_shopping_list || [];
 
   const emptyEl = document.getElementById("recipes-empty-state");
   const wrapperEl = document.getElementById("recipes-compiled-wrapper");
   const tbody = document.getElementById("compiled-ingredients-tbody");
   const adminCol = document.getElementById("compiled-admin-col");
+  const subtotalsStrip = document.getElementById("store-subtotals-strip");
 
   if (isAdmin) {
     adminCol.classList.remove("hidden");
@@ -1173,36 +1190,7 @@ function renderCompiledRecipesList() {
     adminCol.classList.add("hidden");
   }
 
-  const rows = [];
-  let grandTotal = 0;
-  let recipeCount = 0;
-
-  dishes.forEach((d) => {
-    const compiled = d.compiled_ingredients || [];
-    if (compiled.length > 0) {
-      recipeCount += 1;
-      const sortedNames = formatSortedByNames(d.claims || []) || "Unassigned";
-      compiled.forEach((item, idx) => {
-        const cost = Number(item.estimated_cost_gbp || 0);
-        grandTotal += cost;
-        rows.push({
-          dishId: d.id,
-          dishTitle: d.title,
-          recipeTitle: d.recipe_title || d.title,
-          recipeUrl: d.recipe_url,
-          recipeServings: d.recipe_servings || 4,
-          sortedNames,
-          itemIndex: idx,
-          ingredient: item.ingredient || item.original_text,
-          originalText: item.original_text || "",
-          amountFor7: item.amount_for_7 || "Scaled for 7",
-          cost,
-        });
-      });
-    }
-  });
-
-  if (rows.length === 0) {
+  if (groupedList.length === 0) {
     wrapperEl.classList.add("hidden");
     emptyEl.classList.remove("hidden");
     return;
@@ -1211,119 +1199,493 @@ function renderCompiledRecipesList() {
   emptyEl.classList.add("hidden");
   wrapperEl.classList.remove("hidden");
 
-  tbody.innerHTML = rows
-    .map(
-      (r) => `
-      <tr>
-        <td>
-          <strong>${escapeHtml(r.dishTitle)}</strong>
-          <div style="font-size:0.76rem; color:var(--text-muted);">
-            ${
-              r.recipeUrl
-                ? `<a href="${escapeHtml(r.recipeUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--green-primary); text-decoration:none;">🔗 Recipe (Serves ${r.recipeServings} → 7) ↗</a>`
-                : `Serves ${r.recipeServings} → 7`
-            }
-          </div>
-        </td>
-        <td>
-          <span style="font-size:0.83rem; font-weight:600;">${escapeHtml(r.sortedNames)}</span>
-        </td>
-        <td>
-          <strong>${escapeHtml(r.ingredient)}</strong>
+  let grandTotal = 0;
+  const storeSubtotals = {
+    budget: { count: 0, total: 0 },
+    normal: { count: 0, total: 0 },
+    premium: { count: 0, total: 0 },
+    butcher: { count: 0, total: 0 },
+  };
+  const recipeCount = dishes.filter((d) => (d.recipe_ingredients || []).length > 0).length;
+
+  tbody.innerHTML = groupedList
+    .map((item) => {
+      const cost = Number(item.estimated_cost_gbp || 0);
+      grandTotal += cost;
+      const tier = item.store_tier || "normal";
+      if (storeSubtotals[tier]) {
+        storeSubtotals[tier].count += 1;
+        storeSubtotals[tier].total += cost;
+      }
+
+      const prices = item.prices_by_tier || {
+        normal: cost,
+        premium: cost,
+        budget: cost,
+        butcher: cost,
+      };
+
+      const groupedBadgeHtml =
+        item.recipe_count > 1
+          ? `<span class="grouped-count-badge" title="Quantities summed across ${item.recipe_count} recipes">🔗 Combined (${item.recipe_count} recipes)</span>`
+          : "";
+
+      const usesHtml = (item.uses || [])
+        .map(
+          (u) => `
+            <div class="recipe-use-chip">
+              <strong>${escapeHtml(u.dish_title)}</strong>
+              <span>(${escapeHtml(u.scaled_part)})</span>
+              <span style="font-size:0.73rem;">• ${escapeHtml(u.sorted_by)}</span>
+            </div>
+          `
+        )
+        .join("");
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0.25rem;">
+              <strong style="font-size:0.96rem;">${escapeHtml(item.ingredient_name)}</strong>
+              ${groupedBadgeHtml}
+            </div>
+          </td>
+          <td>
+            <div class="recipe-uses-list">
+              ${usesHtml}
+            </div>
+          </td>
+          <td>
+            <span class="amount-7-badge">${escapeHtml(item.total_amount_for_7)}</span>
+          </td>
+          <td class="cost-gbp-cell">
+            £${cost.toFixed(2)}
+          </td>
+          <td>
+            <select
+              class="store-tier-select tier-${escapeHtml(tier)}"
+              data-canonical-key="${escapeHtml(item.canonical_key)}"
+            >
+              <option value="normal" ${tier === "normal" ? "selected" : ""}>
+                🛒 Normal (e.g. Sainsbury's) — £${Number(prices.normal || 0).toFixed(2)}
+              </option>
+              <option value="premium" ${tier === "premium" ? "selected" : ""}>
+                ✨ Premium (e.g. M&amp;S) — £${Number(prices.premium || 0).toFixed(2)}
+              </option>
+              <option value="budget" ${tier === "budget" ? "selected" : ""}>
+                💷 Budget (e.g. Aldi/Lidl) — £${Number(prices.budget || 0).toFixed(2)}
+              </option>
+              <option value="butcher" ${tier === "butcher" ? "selected" : ""}>
+                🔪 Local Butchers (e.g. Rossiter's) — £${Number(prices.butcher || 0).toFixed(2)}
+              </option>
+            </select>
+          </td>
           ${
-            r.originalText && r.originalText !== r.ingredient
-              ? `<div style="font-size:0.75rem; color:var(--text-muted);">From recipe: “${escapeHtml(r.originalText)}”</div>`
-              : ""
-          }
-        </td>
-        <td>
-          <span class="amount-7-badge">${escapeHtml(r.amountFor7)}</span>
-        </td>
-        <td class="cost-gbp-cell">
-          £${r.cost.toFixed(2)}
-        </td>
-        ${
-          isAdmin
-            ? `
-              <td>
-                <div style="display:flex; gap:0.35rem;">
+            isAdmin
+              ? `
+                <td>
                   <button
                     type="button"
-                    class="btn btn-secondary btn-sm btn-edit-compiled-item"
-                    data-dish-id="${r.dishId}"
-                    data-item-idx="${r.itemIndex}"
-                    data-ing="${escapeHtml(r.ingredient)}"
-                    data-amt="${escapeHtml(r.amountFor7)}"
-                    data-cost="${r.cost.toFixed(2)}"
+                    class="btn btn-secondary btn-sm btn-admin-edit-grouped"
+                    data-canonical-key="${escapeHtml(item.canonical_key)}"
+                    data-name="${escapeHtml(item.ingredient_name)}"
+                    data-amt="${escapeHtml(item.total_amount_for_7)}"
+                    data-base-cost="${Number(prices.normal || cost).toFixed(2)}"
                   >
                     ✏️ Edit
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm btn-jump-edit-recipe"
-                    data-dish-id="${r.dishId}"
-                    title="Edit full recipe on Dishes tab"
-                  >
-                    📖 Recipe
-                  </button>
-                </div>
-              </td>
-            `
-            : ""
-        }
-      </tr>
-    `
-    )
+                </td>
+              `
+              : ""
+          }
+        </tr>
+      `;
+    })
     .join("");
+
+  // Render Store Subtotals Breakdown Strip
+  if (subtotalsStrip) {
+    subtotalsStrip.innerHTML = ["butcher", "budget", "normal", "premium"]
+      .map((tKey) => {
+        const st = storeSubtotals[tKey];
+        return `
+          <div class="store-subtotal-card">
+            <div>
+              <strong>${escapeHtml(STORE_TIER_LABELS[tKey])}</strong>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${st.count} item${st.count === 1 ? "" : "s"} assigned</div>
+            </div>
+            <strong style="font-size:1.02rem; color:var(--green-primary);">£${st.total.toFixed(2)}</strong>
+          </div>
+        `;
+      })
+      .join("");
+  }
 
   const perPerson = grandTotal / HOUSE_SIZE;
   document.getElementById("recipe-grand-total").textContent = `£${grandTotal.toFixed(2)}`;
   document.getElementById("recipe-cost-per-person").textContent = `£${perPerson.toFixed(2)}`;
-  document.getElementById("recipe-total-items-count").textContent = `${rows.length} ingredient${rows.length === 1 ? "" : "s"} across ${recipeCount} recipe${recipeCount === 1 ? "" : "s"}`;
+  document.getElementById("recipe-total-items-count").textContent = `${groupedList.length} grouped item${groupedList.length === 1 ? "" : "s"} combined from ${recipeCount} recipe${recipeCount === 1 ? "" : "s"}`;
 
+  // Store tier dropdown change listener
+  tbody.querySelectorAll(".store-tier-select").forEach((sel) => {
+    sel.addEventListener("change", async () => {
+      const canonicalKey = sel.getAttribute("data-canonical-key");
+      const storeTier = sel.value;
+      try {
+        sel.disabled = true;
+        const newState = await apiRequest("/api/shopping/update_store", "POST", {
+          canonical_key: canonicalKey,
+          store_tier: storeTier,
+        });
+        updateState(newState, true);
+        showToast(`Updated store to ${STORE_TIER_CLEAN_NAMES[storeTier]}!`);
+      } catch (err) {
+        showToast(err.message);
+        sel.disabled = false;
+      }
+    });
+  });
+
+  // Admin Edit grouped row listener
   if (isAdmin) {
-    tbody.querySelectorAll(".btn-edit-compiled-item").forEach((btn) => {
+    tbody.querySelectorAll(".btn-admin-edit-grouped").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const dishId = Number(btn.getAttribute("data-dish-id"));
-        const itemIdx = Number(btn.getAttribute("data-item-idx"));
-        const curIng = btn.getAttribute("data-ing") || "";
+        const canonicalKey = btn.getAttribute("data-canonical-key");
+        const curName = btn.getAttribute("data-name") || "";
         const curAmt = btn.getAttribute("data-amt") || "";
-        const curCost = btn.getAttribute("data-cost") || "1.50";
+        const curBase = btn.getAttribute("data-base-cost") || "1.50";
 
-        const newIng = prompt("Edit Ingredient Name:", curIng);
-        if (newIng === null) return;
-        const newAmt = prompt("Edit Amount Needed for 7 People:", curAmt);
+        const newName = prompt("Edit Grouped Ingredient Name:", curName);
+        if (newName === null) return;
+        const newAmt = prompt("Edit Total Amount Needed for 7 People:", curAmt);
         if (newAmt === null) return;
-        const newCostStr = prompt("Edit Estimated UK Supermarket Cost (£):", curCost);
-        if (newCostStr === null) return;
+        const newBaseStr = prompt(
+          "Edit Base Normal (Sainsbury's) Price (£) — other store tiers will scale from this:",
+          curBase
+        );
+        if (newBaseStr === null) return;
 
         try {
-          const newState = await apiRequest("/api/recipes/update_item", "POST", {
-            dish_id: dishId,
-            item_index: itemIdx,
-            ingredient: newIng.trim(),
-            amount_for_7: newAmt.trim(),
-            estimated_cost_gbp: parseFloat(newCostStr.replace("£", "")) || 0,
+          const newState = await apiRequest("/api/shopping/admin_edit", "POST", {
+            canonical_key: canonicalKey,
+            custom_name: newName.trim(),
+            custom_amount: newAmt.trim(),
+            custom_base_cost: parseFloat(newBaseStr.replace("£", "")) || 0,
           });
           updateState(newState, true);
-          showToast("Updated 7-person ingredient & cost!");
+          showToast("Updated grouped item & recalculated store prices!");
         } catch (err) {
           showToast(err.message);
         }
       });
     });
-
-    tbody.querySelectorAll(".btn-jump-edit-recipe").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const dishId = Number(btn.getAttribute("data-dish-id"));
-        expandedDishIds.add(dishId);
-        editingRecipeDishIds.add(dishId);
-        manualRecipeDishIds.add(dishId);
-        setActiveView("dishes");
-        renderDishesList();
-      });
-    });
   }
+}
+
+function exportShoppingListAsPdfTable() {
+  if (!appState || !appState.grouped_shopping_list || appState.grouped_shopping_list.length === 0) {
+    showToast("No shopping list items to export yet!");
+    return;
+  }
+
+  const groupedList = appState.grouped_shopping_list;
+  const settings = appState.settings || {};
+  let grandTotal = 0;
+  groupedList.forEach((item) => {
+    grandTotal += Number(item.estimated_cost_gbp || 0);
+  });
+  const perPerson = grandTotal / HOUSE_SIZE;
+
+  // Group items by selected store establishment for quick-look shopping trip sections
+  const byStore = {
+    butcher: [],
+    budget: [],
+    normal: [],
+    premium: [],
+  };
+  groupedList.forEach((item) => {
+    const t = item.store_tier || "normal";
+    if (!byStore[t]) byStore[t] = [];
+    byStore[t].push(item);
+  });
+
+  const storeSectionsHtml = ["butcher", "budget", "normal", "premium"]
+    .filter((tKey) => byStore[tKey] && byStore[tKey].length > 0)
+    .map((tKey) => {
+      const items = byStore[tKey];
+      const storeSub = items.reduce((acc, x) => acc + Number(x.estimated_cost_gbp || 0), 0);
+      const rowsHtml = items
+        .map((item) => {
+          const dishesUsed = (item.uses || [])
+            .map((u) => `${u.dish_title} (${u.scaled_part})`)
+            .join(", ");
+          return `
+            <tr>
+              <td style="width:34px; text-align:center; font-size:1.15rem;">☐</td>
+              <td><strong>${escapeHtml(item.ingredient_name)}</strong></td>
+              <td><strong>${escapeHtml(item.total_amount_for_7)}</strong></td>
+              <td style="font-size:0.82rem; color:#4b5563;">${escapeHtml(dishesUsed)}</td>
+              <td style="font-size:0.84rem;">${escapeHtml(STORE_TIER_CLEAN_NAMES[tKey])}</td>
+              <td style="text-align:right; font-weight:700;">£${Number(item.estimated_cost_gbp || 0).toFixed(2)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      return `
+        <div class="store-section">
+          <div class="store-header">
+            <h3>${escapeHtml(STORE_TIER_LABELS[tKey])} (${items.length} item${items.length === 1 ? "" : "s"})</h3>
+            <strong>Subtotal: £${storeSub.toFixed(2)}</strong>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:34px; text-align:center;">✓</th>
+                <th style="width:24%;">Ingredient</th>
+                <th style="width:24%;">Total Needed (7 People)</th>
+                <th style="width:28%;">Used In Recipes</th>
+                <th style="width:14%;">Where to Buy</th>
+                <th style="width:10%; text-align:right;">Est. Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    })
+    .join("");
+
+  const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>82 Harrow Christmas Dinner - Shopping List Table (For 7 People)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #18271e;
+      background: #fff;
+      margin: 0;
+      padding: 24px 32px;
+      line-height: 1.4;
+    }
+    .no-print-bar {
+      background: #133020;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .no-print-bar button {
+      background: #f3c65f;
+      color: #2b1d00;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 3px solid #133020;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+    .doc-header h1 {
+      margin: 0 0 4px 0;
+      font-size: 1.55rem;
+    }
+    .doc-header p {
+      margin: 0;
+      color: #556659;
+      font-size: 0.9rem;
+    }
+    .summary-strip {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .summary-box {
+      flex: 1;
+      border: 1.5px solid #d5cbb8;
+      background: #faf7f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .summary-box span {
+      display: block;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #556659;
+    }
+    .summary-box strong {
+      font-size: 1.35rem;
+      color: #133020;
+    }
+    .store-section {
+      margin-bottom: 22px;
+      page-break-inside: avoid;
+    }
+    .store-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #eef5f0;
+      border: 1px solid #c6dcd0;
+      padding: 8px 12px;
+      border-radius: 6px 6px 0 0;
+    }
+    .store-header h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    th, td {
+      border: 1px solid #d8d0c0;
+      padding: 7px 10px;
+      text-align: left;
+    }
+    th {
+      background: #f4efe4;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    @media print {
+      .no-print-bar { display: none !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <span>🎄 <strong>82 Harrow Quick-Look Shopping List Table</strong> — Use "Save as PDF" in the print dialog!</span>
+    <button onclick="window.print()">🖨️ Save as PDF / Print</button>
+  </div>
+
+  <div class="doc-header">
+    <div>
+      <h1>🎄 ${escapeHtml(settings.event_title || "82 Harrow Christmas Dinner")} — Shopping List</h1>
+      <p>Grouped ingredients &amp; quantities scaled for <strong>7 people</strong> • Grouped by establishment</p>
+    </div>
+    <div style="text-align:right; font-size:0.84rem; color:#556659;">
+      <div>${escapeHtml(settings.event_date || "December 2026")} • ${escapeHtml(settings.event_time || "7:00 PM")}</div>
+      <div>${groupedList.length} total shopping items</div>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="summary-box">
+      <span>Total Grouped Items</span>
+      <strong>${groupedList.length} items</strong>
+    </div>
+    <div class="summary-box">
+      <span>Total Estimated Cost</span>
+      <strong>£${grandTotal.toFixed(2)}</strong>
+    </div>
+    <div class="summary-box">
+      <span>Total Cost Each (Split 7 Ways)</span>
+      <strong>£${perPerson.toFixed(2)} / person</strong>
+    </div>
+  </div>
+
+  ${storeSectionsHtml}
+
+  <script>
+    window.addEventListener("load", () => {
+      setTimeout(() => { window.print(); }, 350);
+    });
+  </script>
+</body>
+</html>`;
+
+  const printWin = window.open("", "_blank");
+  if (printWin) {
+    printWin.document.open();
+    printWin.document.write(htmlDoc);
+    printWin.document.close();
+  } else {
+    // Fallback download as standalone HTML file if popup blocked
+    const blob = new Blob([htmlDoc], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "82-Harrow-Christmas-Shopping-List.html";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("Downloaded shopping list table!");
+  }
+}
+
+function exportShoppingListAsCsv() {
+  if (!appState || !appState.grouped_shopping_list || appState.grouped_shopping_list.length === 0) {
+    showToast("No shopping list items to export yet!");
+    return;
+  }
+
+  const groupedList = appState.grouped_shopping_list;
+  let grandTotal = 0;
+  const csvRows = [
+    ["Ingredient", "Total Amount Needed (For 7 People)", "Where to Buy", "Estimated Cost (GBP)", "Used In Recipes"],
+  ];
+
+  groupedList.forEach((item) => {
+    const cost = Number(item.estimated_cost_gbp || 0);
+    grandTotal += cost;
+    const storeName = STORE_TIER_CLEAN_NAMES[item.store_tier || "normal"] || "Normal (Sainsbury's)";
+    const dishesUsed = (item.uses || [])
+      .map((u) => `${u.dish_title} (${u.scaled_part})`)
+      .join(" + ");
+
+    csvRows.push([
+      item.ingredient_name,
+      item.total_amount_for_7,
+      storeName,
+      `£${cost.toFixed(2)}`,
+      dishesUsed,
+    ]);
+  });
+
+  const perPerson = grandTotal / HOUSE_SIZE;
+  csvRows.push([]);
+  csvRows.push(["TOTAL ESTIMATED COST", "", "", `£${grandTotal.toFixed(2)}`, ""]);
+  csvRows.push(["TOTAL COST EACH (DIVIDED BY 7)", "", "", `£${perPerson.toFixed(2)}`, ""]);
+
+  const csvString = csvRows
+    .map((row) =>
+      row
+        .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
+        .join(",")
+    )
+    .join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csvString], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "82-Harrow-Christmas-Shopping-List.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("📊 Downloaded CSV Shopping List Table!");
 }
 
 // =====================================================================
@@ -2325,6 +2687,36 @@ function initEventListeners() {
     searchQuery = e.target.value.trim();
     renderDishesList();
   });
+
+  // Bulk store quick-select buttons
+  document.querySelectorAll(".btn-bulk-store").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const storeTier = btn.getAttribute("data-store");
+      try {
+        btn.disabled = true;
+        const newState = await apiRequest("/api/shopping/update_store", "POST", {
+          canonical_key: "ALL",
+          store_tier: storeTier,
+        });
+        updateState(newState, true);
+        showToast(`Set all items to ${STORE_TIER_CLEAN_NAMES[storeTier]}!`);
+      } catch (err) {
+        showToast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Export Shopping List as PDF Table & CSV buttons
+  const pdfBtn = document.getElementById("btn-export-pdf-table");
+  if (pdfBtn) {
+    pdfBtn.addEventListener("click", exportShoppingListAsPdfTable);
+  }
+  const csvBtn = document.getElementById("btn-export-csv-table");
+  if (csvBtn) {
+    csvBtn.addEventListener("click", exportShoppingListAsCsv);
+  }
 
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();

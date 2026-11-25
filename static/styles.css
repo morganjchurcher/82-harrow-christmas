@@ -1983,3 +1983,118 @@ body {
     grid-column: 1 / -1;
   }
 }
+
+
+/* =========================================================
+   GROUPED SHOPPING LIST, STORE DROPDOWNS & EXPORT BAR
+   ========================================================= */
+.bulk-store-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.grouped-count-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--green-soft);
+  color: var(--green-primary);
+  border: 1px solid #a3dbb9;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.4rem;
+}
+
+.recipe-uses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.recipe-use-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+}
+
+.recipe-use-chip strong {
+  color: var(--text-main);
+}
+
+.store-tier-select {
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-warm);
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: #fff;
+  color: var(--text-main);
+  cursor: pointer;
+  min-width: 215px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.store-tier-select.tier-budget {
+  background: #eef9f2;
+  border-color: #6bc48e;
+  color: #115931;
+}
+
+.store-tier-select.tier-normal {
+  background: #fff;
+  border-color: var(--border-warm);
+}
+
+.store-tier-select.tier-premium {
+  background: #fcf4ff;
+  border-color: #c596dc;
+  color: #5b1d7a;
+}
+
+.store-tier-select.tier-butcher {
+  background: #fff6ed;
+  border-color: #e3a76f;
+  color: #7d3607;
+}
+
+.store-subtotals-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+}
+
+.store-subtotal-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.export-actions-bar {
+  margin-top: 1.15rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--bg-subtle);
+  border: 1.5px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.export-buttons-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

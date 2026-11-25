@@ -166,16 +166,20 @@ def export_full_db_state(conn) -> dict:
         "meat_votes",
         "drinks",
         "drink_selections",
+        "ingredient_preferences",
         "settings",
     ]
     snapshot = {
-        "version": 1,
+        "version": 2,
         "updated_at": datetime.utcnow().isoformat(),
         "tables": {},
     }
     for tbl in tables:
-        rows = conn.execute(f"SELECT * FROM {tbl}").fetchall()
-        snapshot["tables"][tbl] = [dict(r) for r in rows]
+        try:
+            rows = conn.execute(f"SELECT * FROM {tbl}").fetchall()
+            snapshot["tables"][tbl] = [dict(r) for r in rows]
+        except Exception:
+            snapshot["tables"][tbl] = []
     return snapshot
 
 
@@ -190,7 +194,7 @@ def import_full_db_state(conn, snapshot: dict) -> bool:
     conn.execute("PRAGMA foreign_keys=OFF;")
     try:
         # Clear and repopulate in dependency order
-        for tbl in ["drink_selections", "drinks", "meat_votes", "claims", "dishes", "sessions", "users", "settings"]:
+        for tbl in ["drink_selections", "drinks", "meat_votes", "claims", "dishes", "sessions", "users", "ingredient_preferences", "settings"]:
             if tbl in tables_data and isinstance(tables_data[tbl], list):
                 conn.execute(f"DELETE FROM {tbl}")
 
@@ -304,6 +308,25 @@ def import_full_db_state(conn, snapshot: dict) -> bool:
                 (ds.get("user_id"), ds.get("drink_id"), ds.get("selected_at", "")),
             )
 
+        for ip in tables_data.get("ingredient_preferences", []):
+            if ip.get("canonical_key"):
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO ingredient_preferences (
+                        canonical_key, store_tier, custom_name, custom_amount, custom_base_cost, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ip.get("canonical_key"),
+                        ip.get("store_tier", "normal"),
+                        ip.get("custom_name", ""),
+                        ip.get("custom_amount", ""),
+                        ip.get("custom_base_cost"),
+                        ip.get("updated_at", ""),
+                    ),
+                )
+
         for st in tables_data.get("settings", []):
             if st.get("key"):
                 conn.execute(
@@ -318,7 +341,7 @@ def import_full_db_state(conn, snapshot: dict) -> bool:
 
 
 def restore_db_from_cloud(conn) -> bool:
-    """Pull persistent_state.json from GitHub 'data-store' branch on server startup."""
+    """Pull persistent_state.json from GitHub 'data-store' branch on server startup (with local backup fallback)."""
     global _CACHED_REMOTE_SHA, _LAST_CLOUD_SYNC_STATUS
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_STATE_PATH}?ref={GITHUB_DATA_BRANCH}"
     headers = {
@@ -352,6 +375,19 @@ def restore_db_from_cloud(conn) -> bool:
     except Exception as exc:
         _LAST_CLOUD_SYNC_STATUS = "offline"
         print(f"[Cloud Sync] Could not reach GitHub on startup: {exc}")
+
+    # Fallback: if local database has 0 dishes and initial_cloud_backup.json exists, restore from it
+    try:
+        dish_cnt = conn.execute("SELECT COUNT(*) AS cnt FROM dishes").fetchone()["cnt"]
+        fallback_path = os.path.join(BASE_DIR, "initial_cloud_backup.json")
+        if dish_cnt == 0 and os.path.isfile(fallback_path):
+            with open(fallback_path, "r", encoding="utf-8") as f:
+                snap = json.load(f)
+            if import_full_db_state(conn, snap):
+                print("[Cloud Sync] Restored database state from bundled initial_cloud_backup.json!")
+                return True
+    except Exception as exc:
+        print(f"[Cloud Sync] Fallback restore error: {exc}")
     return False
 
 
@@ -544,6 +580,15 @@ def init_db():
                     selected_at TEXT NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (drink_id) REFERENCES drinks(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS ingredient_preferences (
+                    canonical_key TEXT PRIMARY KEY,
+                    store_tier TEXT NOT NULL DEFAULT 'normal',
+                    custom_name TEXT NOT NULL DEFAULT '',
+                    custom_amount TEXT NOT NULL DEFAULT '',
+                    custom_base_cost REAL,
+                    updated_at TEXT NOT NULL DEFAULT ''
                 );
 
                 CREATE TABLE IF NOT EXISTS settings (
@@ -1239,6 +1284,564 @@ def user_row_to_dict(row) -> dict:
     return d
 
 
+STORE_TIERS = [
+    {"id": "normal", "label": "Normal (e.g. Sainsbury's)", "short": "Normal (Sainsbury's)"},
+    {"id": "premium", "label": "Premium (e.g. M&S)", "short": "Premium (M&S)"},
+    {"id": "budget", "label": "Budget (e.g. Aldi/Lidl)", "short": "Budget (Aldi/Lidl)"},
+    {"id": "butcher", "label": "Local Butchers (e.g. Rossiter's)", "short": "Local Butchers (Rossiter's)"},
+]
+VALID_STORE_TIERS = {s["id"] for s in STORE_TIERS}
+
+
+def canonicalize_ingredient(raw_text: str) -> tuple[str, str, str, str]:
+    """
+    Map a raw ingredient line to (canonical_key, display_name, category_type, unit_mode)
+    so identical ingredients across different recipes are grouped and summed together.
+    """
+    t = (raw_text or "").lower()
+    if ("duck" in t or "goose" in t) and "fat" in t:
+        return ("duck_goose_fat", "Duck or Goose Fat", "meat_fat", "weight_g")
+    if "chicken" in t and not any(x in t for x in ["stock", "gravy", "cube", "bouillon"]):
+        return ("whole_chicken", "Whole Chicken", "meat", "weight_g")
+    if "turkey" in t and not any(x in t for x in ["stock", "gravy", "cube"]):
+        return ("turkey", "Turkey", "meat", "weight_g")
+    if "sausage meat" in t or "sausagemeat" in t:
+        return ("pork_sausagemeat", "Pork Sausagemeat", "meat", "weight_g")
+    if "sausage" in t or "chipolata" in t or "pigs in blankets" in t:
+        return ("pork_sausages", "Pork Sausages", "meat", "count")
+    if "bacon" in t or "pancetta" in t or "lardon" in t:
+        return ("bacon", "Bacon (Streaky Rashers & Diced)", "meat", "bacon")
+    if "gammon" in t or ("ham" in t and "champagne" not in t):
+        return ("gammon", "Gammon", "meat", "weight_g")
+    if "beef" in t and not any(x in t for x in ["stock", "gravy", "cube", "suet"]):
+        return ("beef", "Roast Beef", "meat", "weight_g")
+    if "lamb" in t and "stock" not in t:
+        return ("lamb", "Roast Lamb", "meat", "weight_g")
+    if "pork" in t and "stock" not in t:
+        return ("pork", "Roast Pork", "meat", "weight_g")
+    if "butter" in t and "butternut" not in t and "peanut" not in t:
+        return ("butter", "Butter", "dairy", "weight_g")
+    if "olive oil" in t:
+        return ("olive_oil", "Olive Oil", "pantry", "volume_ml")
+    if "sunflower" in t or "vegetable oil" in t or "rapeseed oil" in t or "cooking oil" in t:
+        return ("veg_sunflower_oil", "Sunflower / Vegetable Oil", "pantry", "volume_ml")
+    if "double cream" in t or "single cream" in t or "whipping cream" in t or "cream" in t:
+        return ("cream", "Cream", "dairy", "volume_ml")
+    if "milk" in t:
+        return ("milk", "Milk", "dairy", "volume_ml")
+    if any(x in t for x in ["cheddar", "cheese", "parmesan", "gruyere", "stilton"]):
+        return ("cheese", "Cheese", "dairy", "weight_g")
+    if "egg" in t and "aubergine" not in t:
+        return ("eggs", "Eggs", "dairy", "count")
+    if "potato" in t or "maris piper" in t:
+        return ("potatoes", "Maris Piper Potatoes", "produce", "weight_g")
+    if "sprout" in t:
+        return ("brussels_sprouts", "Brussels Sprouts", "produce", "weight_g")
+    if "carrot" in t:
+        return ("carrots", "Carrots", "produce", "weight_g")
+    if "parsnip" in t:
+        return ("parsnips", "Parsnips", "produce", "weight_g")
+    if "cauliflower" in t:
+        return ("cauliflower", "Cauliflower", "produce", "count")
+    if "cabbage" in t:
+        return ("cabbage", "Red / Savoy Cabbage", "produce", "weight_g")
+    if "walnut" in t:
+        return ("walnuts", "Walnuts", "produce", "weight_g")
+    if "chestnut" in t:
+        return ("chestnuts", "Chestnuts", "produce", "weight_g")
+    if "cranberr" in t:
+        return ("cranberries", "Cranberries / Cranberry Sauce", "produce", "weight_g")
+    if "onion" in t or "shallot" in t:
+        return ("onions", "Onions", "produce", "count")
+    if "garlic" in t:
+        return ("garlic", "Garlic (Bulbs & Cloves)", "produce", "garlic")
+    if "lemon" in t:
+        return ("lemons", "Lemons (Whole, Zest & Juice)", "produce", "citrus")
+    if "orange" in t:
+        return ("oranges", "Oranges (Whole & Zest)", "produce", "citrus")
+    if "sage" in t:
+        return ("fresh_sage", "Fresh Sage", "herbs", "herbs")
+    if "thyme" in t:
+        return ("fresh_thyme", "Fresh Thyme", "herbs", "herbs")
+    if "rosemary" in t:
+        return ("fresh_rosemary", "Fresh Rosemary", "herbs", "herbs")
+    if "parsley" in t:
+        return ("fresh_parsley", "Fresh Parsley", "herbs", "herbs")
+    if "chive" in t:
+        return ("fresh_chives", "Fresh Chives", "herbs", "herbs")
+    if "honey" in t:
+        return ("honey", "Clear Honey", "pantry", "weight_g")
+    if "flour" in t or "cornflour" in t:
+        return ("flour", "Plain Flour", "pantry", "weight_g")
+    if "breadcrumb" in t:
+        return ("breadcrumbs", "Fresh White Breadcrumbs", "pantry", "weight_g")
+    if "white wine" in t:
+        return ("white_wine", "White Wine", "pantry", "volume_ml")
+    if "red wine" in t or "port" in t:
+        return ("red_wine", "Red Wine / Port", "pantry", "volume_ml")
+    if "stock" in t or "gravy" in t or "bouillon" in t:
+        return ("stock_gravy", "Stock / Gravy", "pantry", "volume_ml")
+    if "salt" in t or "pepper" in t:
+        return ("salt_and_pepper", "Sea Salt & Black Pepper", "pantry", "seasoning")
+
+    # Fallback cleaner
+    cleaned = re.sub(r"\([^)]*\)", "", raw_text or "")
+    cleaned = re.sub(
+        r"^\d+[\d\s./½⅓⅔¼¾⅛⅜⅝⅞a-zA-Z]*\b(?:kg|g|ml|l|tbsp|tsp|cup|oz|lb|cloves?|sprigs?|slices?|rashers?|packs?|bunche?s?)\b\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip(" ,-")
+    key = re.sub(r"[^a-z0-9]+", "_", cleaned.lower()).strip("_") or "other_item"
+    disp = cleaned.strip().capitalize() if cleaned.strip() else clean_text(raw_text)
+    return (key, disp, "pantry", "generic")
+
+
+def extract_scaled_contribution(raw_line: str, base_servings: int, canonical_key: str, unit_mode: str) -> dict:
+    """
+    Parse a single recipe ingredient line and scale it from base_servings to HOUSE_SIZE (7 people),
+    returning standardized numeric values (grams, ml, count, etc.) so multiple recipes can be summed.
+    """
+    s = clean_text(raw_line)
+    # Remove dual imperial slash units after metric (e.g. "40g/1½oz" -> "40g", "1.5 kg / 3lb" -> "1.5 kg", "100ml/3½fl oz" -> "100ml")
+    s = re.sub(
+        r"(\d+(?:\.\d+)?\s*(?:kg|g|ml|l))\s*/\s*[\d½⅓⅔¼¾⅛⅜⅝⅞/.]+(?:\s*(?:lb|oz|fl\s*oz|pint|cups?))?(?:\s+\d+[\d½⅓⅔¼¾⅛⅜⅝⅞/.]*\s*(?:oz|fl\s*oz))?",
+        r"\1",
+        s,
+        flags=re.IGNORECASE,
+    )
+    # Remove "zest of " or "juice of " prefix so "zest of 1 orange" parses quantity 1
+    s_for_qty = re.sub(r"^(?:finely\s+grated\s+)?(?:zest|juice)\s+(?:and\s+(?:zest|juice)\s+)?of\s+", "", s, flags=re.IGNORECASE)
+
+    for uf in UNICODE_FRACTIONS:
+        s_for_qty = s_for_qty.replace(uf, f" {uf}")
+    s_for_qty = re.sub(r"\s+", " ", s_for_qty).strip()
+
+    factor = HOUSE_SIZE / float(max(1, int(base_servings or 4)))
+
+    pattern = re.compile(
+        r"^(\d+(?:\.\d+)?(?:\s+\d+/\d+|\s+[½⅓⅔¼¾⅛⅜⅝⅞])?|\d+/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])"
+        r"(?:\s*(?:-|to|–)\s*(\d+(?:\.\d+)?))?"
+        r"\s*(kg|g|grams?|ml|l|litres?|cups?|tbsp|tablespoons?|tsp|teaspoons?|oz|lb|cloves?|bulbs?|cans?|tins?|packs?|packets?|bunche?s?|sprigs?|leaves|leaf|slices?|rashers?)?\b",
+        re.IGNORECASE,
+    )
+    m = pattern.match(s_for_qty)
+
+    qty = None
+    unit = ""
+    if m:
+        q1 = sum(parse_number_token(tok) for tok in m.group(1).split())
+        if m.group(2):
+            q2 = parse_number_token(m.group(2))
+            if q2 > q1:
+                q1 = (q1 + q2) / 2.0
+        if q1 > 0:
+            qty = q1 * factor
+            unit = (m.group(3) or "").lower()
+            if not unit:
+                lower_line = s_for_qty.lower()
+                if re.search(r"\b(rashers?|slices?)\b", lower_line):
+                    unit = "rashers"
+                elif re.search(r"\bbulbs?\b", lower_line):
+                    unit = "bulbs"
+                elif re.search(r"\bcloves?\b", lower_line):
+                    unit = "cloves"
+                elif re.search(r"\b(sprigs?|leaves|leaf)\b", lower_line):
+                    unit = "sprigs"
+
+    # Standardize into grams, ml, or count
+    grams = 0.0
+    ml = 0.0
+    count = 0.0
+    rashers = 0.0
+    cloves = 0.0
+    bulbs = 0.0
+    sprigs = 0.0
+    tbsp_herbs = 0.0
+    short_label = ""
+
+    if qty is not None:
+        if unit in ("kg",):
+            grams = qty * 1000.0
+        elif unit in ("g", "gram", "grams"):
+            grams = qty
+        elif unit == "oz":
+            grams = qty * 28.35
+        elif unit == "lb":
+            grams = qty * 453.6
+        elif unit in ("l", "litre", "litres"):
+            ml = qty * 1000.0
+        elif unit == "ml":
+            ml = qty
+        elif unit in ("cup", "cups"):
+            if unit_mode == "weight_g":
+                grams = qty * (227.0 if canonical_key == "butter" else (340.0 if canonical_key == "honey" else 130.0))
+            else:
+                ml = qty * 240.0
+        elif unit in ("tbsp", "tablespoon", "tablespoons"):
+            if unit_mode == "weight_g":
+                grams = qty * (21.0 if canonical_key == "honey" else 15.0)
+            elif unit_mode == "volume_ml":
+                ml = qty * 15.0
+            elif unit_mode == "citrus":
+                count = qty * 0.4  # 1 tbsp zest/juice ~ 0.4 lemon
+            elif unit_mode == "herbs":
+                tbsp_herbs = qty
+            else:
+                ml = qty * 15.0
+        elif unit in ("tsp", "teaspoon", "teaspoons"):
+            if unit_mode == "weight_g":
+                grams = qty * (7.0 if canonical_key == "honey" else 5.0)
+            elif unit_mode == "volume_ml":
+                ml = qty * 5.0
+            elif unit_mode == "herbs":
+                tbsp_herbs = qty / 3.0
+            else:
+                ml = qty * 5.0
+        elif unit in ("rasher", "rashers", "slice", "slices"):
+            rashers = qty
+            grams = qty * 22.0
+        elif unit in ("clove", "cloves"):
+            cloves = qty
+        elif unit in ("bulb", "bulbs"):
+            bulbs = qty
+        elif unit in ("sprig", "sprigs", "leaves", "leaf"):
+            sprigs = qty
+        else:
+            count = qty
+
+    # Build human-readable per-dish scaled contribution summary
+    if grams >= 1000:
+        short_label = f"{round(grams / 1000.0, 2):g} kg"
+    elif grams > 0:
+        if rashers > 0:
+            short_label = f"{int(math.ceil(rashers - 0.15))} rashers"
+        else:
+            short_label = f"{max(5, int(round(grams / 5.0) * 5))} g"
+    elif ml >= 1000:
+        short_label = f"{round(ml / 1000.0, 2):g} L"
+    elif ml > 0:
+        short_label = f"{max(5, int(round(ml / 5.0) * 5))} ml"
+    elif bulbs > 0:
+        short_label = f"{round(bulbs, 1):g} bulb{'s' if bulbs > 1.1 else ''}"
+    elif cloves > 0:
+        short_label = f"{int(math.ceil(cloves - 0.15))} cloves"
+    elif sprigs > 0:
+        short_label = f"{int(math.ceil(sprigs - 0.15))} sprigs/leaves"
+    elif tbsp_herbs > 0:
+        short_label = f"{round(tbsp_herbs, 1):g} tbsp"
+    elif count > 0:
+        short_label = f"{round(count, 1):g}"
+    else:
+        short_label = "to taste / 1x"
+
+    return {
+        "grams": grams,
+        "ml": ml,
+        "count": count,
+        "rashers": rashers,
+        "cloves": cloves,
+        "bulbs": bulbs,
+        "sprigs": sprigs,
+        "tbsp_herbs": tbsp_herbs,
+        "short_label": short_label,
+    }
+
+
+def estimate_grouped_tier_prices(
+    canonical_key: str,
+    category_type: str,
+    total_grams: float,
+    total_ml: float,
+    total_count: float,
+    custom_base_cost: float = None,
+) -> dict:
+    """
+    Calculate estimated UK costs (£ GBP) for the grouped 7-person total across all 4 establishments:
+    - normal: Normal (e.g. Sainsbury's)
+    - premium: Premium (e.g. M&S)
+    - budget: Budget (e.g. Aldi/Lidl)
+    - butcher: Local Butchers (e.g. Rossiter's)
+    """
+    # 1. Calculate Base Normal (Sainsbury's) cost for the total grouped quantity
+    if custom_base_cost is not None and custom_base_cost >= 0:
+        base = float(custom_base_cost)
+    else:
+        if canonical_key == "whole_chicken":
+            kg = max(1.5, (total_grams or 1750.0) / 1000.0)
+            base = round(kg * 3.95, 2)  # ~£6.90 for 1.75kg chicken at Sainsbury's
+        elif canonical_key == "turkey":
+            kg = max(2.5, (total_grams or 3000.0) / 1000.0)
+            base = round(kg * 6.50, 2)
+        elif canonical_key == "pork_sausagemeat":
+            packs = max(1, math.ceil((total_grams or 350.0) / 400.0))
+            base = round(packs * 2.75, 2)
+        elif canonical_key == "pork_sausages":
+            packs = max(1, math.ceil((total_count or 8.0) / 6.0))
+            base = round(packs * 2.85, 2)
+        elif canonical_key == "bacon":
+            packs = max(1, math.ceil((total_grams or 250.0) / 240.0))
+            base = round(packs * 2.40, 2)
+        elif canonical_key == "duck_goose_fat":
+            jars = max(1, math.ceil((total_grams or 175.0) / 300.0))
+            base = round(jars * 3.50, 2)
+        elif canonical_key == "butter":
+            blocks = max(1, math.ceil((total_grams or 200.0) / 250.0))
+            base = round(blocks * 2.15, 2)
+        elif canonical_key == "potatoes":
+            bags = max(1, math.ceil((total_grams or 1750.0) / 2000.0))
+            base = round(bags * 1.95, 2)
+        elif canonical_key == "brussels_sprouts":
+            bags = max(1, math.ceil((total_grams or 875.0) / 500.0))
+            base = round(bags * 1.15, 2)
+        elif canonical_key == "carrots":
+            bags = max(1, math.ceil((total_grams or 700.0) / 1000.0))
+            base = round(bags * 0.95, 2)
+        elif canonical_key == "parsnips":
+            bags = max(1, math.ceil((total_grams or 500.0) / 500.0))
+            base = round(bags * 1.25, 2)
+        elif canonical_key == "walnuts":
+            packs = max(1, math.ceil((total_grams or 135.0) / 150.0))
+            base = round(packs * 2.35, 2)
+        elif canonical_key == "breadcrumbs":
+            base = 1.40
+        elif canonical_key == "honey":
+            base = 1.85
+        elif canonical_key == "flour":
+            base = 0.85
+        elif canonical_key in ("olive_oil", "veg_sunflower_oil"):
+            # Cooking oil portion / small bottle share
+            base = 1.45 if canonical_key == "olive_oil" else 1.10
+        elif canonical_key in ("white_wine", "red_wine"):
+            base = 6.25
+        elif canonical_key == "lemons":
+            cnt = max(1, math.ceil(total_count or 2.0))
+            base = round(min(1.60, cnt * 0.40), 2)
+        elif canonical_key == "oranges":
+            cnt = max(1, math.ceil(total_count or 2.0))
+            base = round(min(1.85, cnt * 0.45), 2)
+        elif canonical_key == "onions":
+            cnt = max(1, math.ceil(total_count or 2.0))
+            base = round(max(0.85, cnt * 0.35), 2)
+        elif canonical_key == "garlic":
+            base = 0.95
+        elif category_type == "herbs":
+            base = 1.05
+        elif canonical_key == "salt_and_pepper":
+            base = 1.20
+        else:
+            base = 1.65
+
+    # 2. Apply realistic UK establishment price multipliers
+    if category_type in ("meat", "meat_fat"):
+        prices = {
+            "normal": round(base, 2),
+            "budget": round(base * 0.74, 2),    # Aldi/Lidl meat & poultry
+            "premium": round(base * 1.54, 2),   # M&S Foodhall meat & poultry
+            "butcher": round(base * 1.78, 2),   # Rossiter's Local Butchers free-range meat
+        }
+    elif category_type == "dairy":
+        prices = {
+            "normal": round(base, 2),
+            "budget": round(base * 0.78, 2),    # Aldi/Lidl butter & dairy
+            "premium": round(base * 1.42, 2),   # M&S butter & dairy
+            "butcher": round(base * 1.48, 2),   # Butcher / farm-shop farmhouse dairy
+        }
+    else:
+        prices = {
+            "normal": round(base, 2),
+            "budget": round(base * 0.68, 2),    # Aldi/Lidl Super 6 veg & pantry
+            "premium": round(base * 1.48, 2),   # M&S produce & groceries
+            "butcher": round(base * 1.35, 2),   # Rossiter's farm-shop accompaniment items
+        }
+    return prices
+
+
+def compile_grouped_shopping_list(conn, dishes: list) -> list:
+    """
+    Group identical ingredients across all recipes, quantify the combined 7-person amount needed,
+    and calculate prices according to each item's selected establishment dropdown.
+    """
+    prefs_rows = conn.execute("SELECT * FROM ingredient_preferences").fetchall()
+    prefs_map = {r["canonical_key"]: dict(r) for r in prefs_rows}
+
+    grouped = {}
+    order_Keys = []
+
+    for d in dishes:
+        raw_ings = d.get("recipe_ingredients") or []
+        if not raw_ings:
+            continue
+        servings = max(1, int(d.get("recipe_servings") or 4))
+        claims = d.get("claims") or []
+        sorted_by = ", ".join(c["display_name"] for c in claims) if claims else "Unassigned"
+
+        for raw_line in raw_ings:
+            if not str(raw_line).strip():
+                continue
+            c_key, disp_name, cat_type, unit_mode = canonicalize_ingredient(raw_line)
+            contrib = extract_scaled_contribution(raw_line, servings, c_key, unit_mode)
+
+            if c_key not in grouped:
+                order_Keys.append(c_key)
+                grouped[c_key] = {
+                    "canonical_key": c_key,
+                    "default_name": disp_name,
+                    "category_type": cat_type,
+                    "unit_mode": unit_mode,
+                    "total_grams": 0.0,
+                    "total_ml": 0.0,
+                    "total_count": 0.0,
+                    "total_rashers": 0.0,
+                    "total_cloves": 0.0,
+                    "total_bulbs": 0.0,
+                    "total_sprigs": 0.0,
+                    "total_tbsp_herbs": 0.0,
+                    "uses": [],
+                }
+
+            g = grouped[c_key]
+            g["total_grams"] += contrib["grams"]
+            g["total_ml"] += contrib["ml"]
+            g["total_count"] += contrib["count"]
+            g["total_rashers"] += contrib["rashers"]
+            g["total_cloves"] += contrib["cloves"]
+            g["total_bulbs"] += contrib["bulbs"]
+            g["total_sprigs"] += contrib["sprigs"]
+            g["total_tbsp_herbs"] += contrib["tbsp_herbs"]
+            g["uses"].append(
+                {
+                    "dish_id": d["id"],
+                    "dish_title": d["title"],
+                    "sorted_by": sorted_by,
+                    "scaled_part": contrib["short_label"],
+                    "raw_text": clean_text(raw_line),
+                }
+            )
+
+    result = []
+    for c_key in order_Keys:
+        g = grouped[c_key]
+        um = g["unit_mode"]
+        tg = g["total_grams"]
+        tml = g["total_ml"]
+        tcnt = g["total_count"]
+        trash = g["total_rashers"]
+        tcloves = g["total_cloves"]
+        tbulbs = g["total_bulbs"]
+        tsprigs = g["total_sprigs"]
+        ttbsp_h = g["total_tbsp_herbs"]
+
+        # Format combined total quantity needed for 7 people
+        if um == "bacon" and trash > 0 and (tg - trash * 22.0) > 15:
+            diced_g = max(5, int(round((tg - trash * 22.0) / 5.0) * 5))
+            r_cnt = int(math.ceil(trash - 0.15))
+            total_g = max(10, int(round(tg / 5.0) * 5))
+            total_amount_str = f"~{total_g} g total ({diced_g} g diced + {r_cnt} streaky rashers)"
+        elif um == "garlic":
+            equiv_bulbs = tbulbs + (tcloves / 10.0)
+            if equiv_bulbs >= 1.0:
+                b_cnt = max(1, int(math.ceil(equiv_bulbs - 0.15)))
+                total_amount_str = f"{b_cnt} garlic bulb{'s' if b_cnt > 1 else ''}"
+                if tcloves > 0 and tbulbs > 0:
+                    total_amount_str += f" ({int(math.ceil(tbulbs))} bulbs + {int(math.ceil(tcloves))} cloves)"
+            else:
+                c_cnt = max(1, int(math.ceil(tcloves - 0.15)))
+                total_amount_str = f"{c_cnt} garlic cloves"
+        elif um == "citrus":
+            fruit_name = "lemon" if c_key == "lemons" else "orange"
+            whole_needed = max(1, int(math.ceil((tcnt if tcnt > 0 else len(g["uses"]) * 0.6) - 0.15)))
+            total_amount_str = f"{whole_needed} whole {fruit_name}{'s' if whole_needed > 1 else ''}"
+        elif um == "herbs":
+            parts = []
+            if tsprigs > 0:
+                parts.append(f"~{int(math.ceil(tsprigs - 0.15))} sprigs/leaves")
+            if ttbsp_h > 0:
+                parts.append(f"~{round(ttbsp_h, 1):g} tbsp chopped")
+            detail = " + ".join(parts) if parts else "1 bunch"
+            total_amount_str = f"1 fresh pack ({detail})"
+        elif um == "seasoning":
+            dish_names_count = len({u["dish_title"] for u in g["uses"]})
+            total_amount_str = f"1 tub Sea Salt & Black Pepper (seasoning for {dish_names_count} dishes)"
+        elif tg >= 1000:
+            total_amount_str = f"{round(tg / 1000.0, 2):g} kg"
+        elif tg > 0:
+            rounded_g = max(5, int(round(tg / 5.0) * 5))
+            if c_key in ("honey", "flour") and rounded_g < 120:
+                tbsp_eq = round(tg / (21.0 if c_key == "honey" else 15.0), 1)
+                total_amount_str = f"{rounded_g} g (~{tbsp_eq:g} tbsp)"
+            else:
+                total_amount_str = f"{rounded_g} g"
+        elif tml >= 1000:
+            total_amount_str = f"{round(tml / 1000.0, 2):g} L"
+        elif tml > 0:
+            rounded_ml = max(5, int(round(tml / 5.0) * 5))
+            if rounded_ml <= 120:
+                tbsp_eq = round(tml / 15.0, 1)
+                total_amount_str = f"{rounded_ml} ml (~{tbsp_eq:g} tbsp)"
+            else:
+                total_amount_str = f"{rounded_ml} ml"
+        elif tcnt > 0:
+            c_int = max(1, int(math.ceil(tcnt - 0.15)))
+            if c_key == "pork_sausages":
+                total_amount_str = f"{c_int} pork sausages"
+            elif c_key == "onions":
+                total_amount_str = f"{c_int} large onion{'s' if c_int > 1 else ''}"
+            else:
+                total_amount_str = f"{c_int}"
+        else:
+            total_amount_str = f"Scaled for {HOUSE_SIZE} people"
+
+        pref = prefs_map.get(c_key) or {}
+        default_tier = "butcher" if g["category_type"] == "meat" and not pref else (pref.get("store_tier") or "normal")
+        # Wait: let default store tier be "normal" unless selected in dropdown so baseline starts consistent
+        store_tier = pref.get("store_tier") if pref.get("store_tier") in VALID_STORE_TIERS else "normal"
+        custom_name = (pref.get("custom_name") or "").strip()
+        custom_amount = (pref.get("custom_amount") or "").strip()
+        custom_base_cost = pref.get("custom_base_cost")
+
+        effective_count = tcnt
+        if um == "citrus" and effective_count <= 0:
+            effective_count = len(g["uses"]) * 0.6
+
+        prices_by_tier = estimate_grouped_tier_prices(
+            c_key,
+            g["category_type"],
+            tg,
+            tml,
+            effective_count,
+            custom_base_cost=custom_base_cost,
+        )
+
+        # Deduplicate dish breakdown display
+        dishes_summary = []
+        seen_dish_raw = set()
+        for u in g["uses"]:
+            sig = (u["dish_title"], u["raw_text"])
+            if sig not in seen_dish_raw:
+                seen_dish_raw.add(sig)
+                dishes_summary.append(u)
+
+        result.append(
+            {
+                "canonical_key": c_key,
+                "ingredient_name": custom_name or g["default_name"],
+                "category_type": g["category_type"],
+                "total_amount_for_7": custom_amount or total_amount_str,
+                "recipe_count": len({u["dish_id"] for u in dishes_summary}),
+                "uses": dishes_summary,
+                "store_tier": store_tier,
+                "prices_by_tier": prices_by_tier,
+                "estimated_cost_gbp": prices_by_tier.get(store_tier, prices_by_tier["normal"]),
+            }
+        )
+
+    # Sort grouped list cleanly by category order: meat -> produce -> dairy -> herbs -> pantry
+    cat_rank = {"meat": 0, "meat_fat": 1, "produce": 2, "dairy": 3, "herbs": 4, "pantry": 5}
+    result.sort(key=lambda x: (cat_rank.get(x["category_type"], 9), x["ingredient_name"].lower()))
+    return result
+
+
 def fetch_dashboard_state(conn, current_user=None):
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     settings = {r["key"]: r["value"] for r in rows}
@@ -1342,6 +1945,8 @@ def fetch_dashboard_state(conn, current_user=None):
         drd["drinkers"] = drinkers_by_drink.get(drd["id"], [])
         drinks.append(drd)
 
+    grouped_shopping_list = compile_grouped_shopping_list(conn, dishes) if current_user else []
+
     return {
         "house_size": HOUSE_SIZE,
         "has_admin": any(u["role"] == "admin" for u in users),
@@ -1361,6 +1966,8 @@ def fetch_dashboard_state(conn, current_user=None):
         },
         "users": users if current_user else [],
         "dishes": dishes if current_user else [],
+        "grouped_shopping_list": grouped_shopping_list,
+        "store_tiers": STORE_TIERS,
         "meat_poll": {
             "primary_meat": {"label": "Roast Chicken", "emoji": "🍗", "note": "Non-Negotiable Centrepiece"},
             "options": MEAT_POLL_OPTIONS,
@@ -1849,6 +2456,95 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     conn.execute(
                         "UPDATE dishes SET recipe_custom_items = ? WHERE id = ?",
                         (json.dumps(custom_items), dish_id),
+                    )
+                    commit_and_sync(conn)
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 7C. UPDATE STORE TIER DROPDOWN FOR GROUPED SHOPPING LIST ITEM
+                if path == "/api/shopping/update_store":
+                    canonical_key = (data.get("canonical_key") or "").strip()
+                    store_tier = (data.get("store_tier") or "normal").strip().lower()
+                    if store_tier not in VALID_STORE_TIERS:
+                        return self.send_json(400, {"error": "Invalid store selection."})
+                    if not canonical_key:
+                        return self.send_json(400, {"error": "Ingredient key is required."})
+
+                    now_iso = datetime.utcnow().isoformat()
+                    if canonical_key == "ALL":
+                        # Bulk set store tier for all current grouped ingredients
+                        current_state = fetch_dashboard_state(conn, user)
+                        for item in current_state.get("grouped_shopping_list", []):
+                            ck = item["canonical_key"]
+                            existing_pref = conn.execute(
+                                "SELECT * FROM ingredient_preferences WHERE canonical_key = ?",
+                                (ck,),
+                            ).fetchone()
+                            if existing_pref:
+                                conn.execute(
+                                    "UPDATE ingredient_preferences SET store_tier = ?, updated_at = ? WHERE canonical_key = ?",
+                                    (store_tier, now_iso, ck),
+                                )
+                            else:
+                                conn.execute(
+                                    """
+                                    INSERT INTO ingredient_preferences (canonical_key, store_tier, custom_name, custom_amount, custom_base_cost, updated_at)
+                                    VALUES (?, ?, '', '', NULL, ?)
+                                    """,
+                                    (ck, store_tier, now_iso),
+                                )
+                    else:
+                        existing_pref = conn.execute(
+                            "SELECT * FROM ingredient_preferences WHERE canonical_key = ?",
+                            (canonical_key,),
+                        ).fetchone()
+                        if existing_pref:
+                            conn.execute(
+                                "UPDATE ingredient_preferences SET store_tier = ?, updated_at = ? WHERE canonical_key = ?",
+                                (store_tier, now_iso, canonical_key),
+                            )
+                        else:
+                            conn.execute(
+                                """
+                                INSERT INTO ingredient_preferences (canonical_key, store_tier, custom_name, custom_amount, custom_base_cost, updated_at)
+                                VALUES (?, ?, '', '', NULL, ?)
+                                """,
+                                (canonical_key, store_tier, now_iso),
+                            )
+                    commit_and_sync(conn)
+                    return self.send_json(200, fetch_dashboard_state(conn, user))
+
+                # 7D. ADMIN EDIT GROUPED SHOPPING LIST ITEM (NAME, TOTAL AMOUNT, BASE PRICE)
+                if path == "/api/shopping/admin_edit":
+                    if not is_admin:
+                        return self.send_json(403, {"error": "Only the Administrator can edit grouped item details."})
+                    canonical_key = (data.get("canonical_key") or "").strip()
+                    if not canonical_key:
+                        return self.send_json(400, {"error": "Ingredient key is required."})
+
+                    custom_name = (data.get("custom_name") or "").strip()
+                    custom_amount = (data.get("custom_amount") or "").strip()
+                    raw_base = data.get("custom_base_cost")
+                    custom_base_cost = None
+                    if raw_base is not None and str(raw_base).strip() != "":
+                        try:
+                            custom_base_cost = max(0.0, round(float(raw_base), 2))
+                        except Exception:
+                            custom_base_cost = None
+
+                    now_iso = datetime.utcnow().isoformat()
+                    existing_pref = conn.execute(
+                        "SELECT * FROM ingredient_preferences WHERE canonical_key = ?",
+                        (canonical_key,),
+                    ).fetchone()
+                    store_tier = existing_pref["store_tier"] if existing_pref else "normal"
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO ingredient_preferences (
+                            canonical_key, store_tier, custom_name, custom_amount, custom_base_cost, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (canonical_key, store_tier, custom_name, custom_amount, custom_base_cost, now_iso),
                     )
                     commit_and_sync(conn)
                     return self.send_json(200, fetch_dashboard_state(conn, user))
