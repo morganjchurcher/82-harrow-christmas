@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:17.607693",
+  "updated_at": "2026-11-25T12:26:19.127438",
   "tables": {
     "users": [
       {
@@ -304,6 +304,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:26:17.600708"
+      },
+      {
+        "canonical_key": "oranges",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:19.120625"
       }
     ],
     "settings": [
