@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updated_at": "2026-11-25T12:05:08.639176",
+  "version": 2,
+  "updated_at": "2026-11-25T12:25:43.335340",
   "tables": {
     "users": [
       {
@@ -246,6 +246,16 @@
         "user_id": 1,
         "drink_id": 1,
         "selected_at": "2026-11-25T11:57:25.488691"
+      }
+    ],
+    "ingredient_preferences": [
+      {
+        "canonical_key": "pork_sausagemeat",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:25:43.325390"
       }
     ],
     "settings": [
