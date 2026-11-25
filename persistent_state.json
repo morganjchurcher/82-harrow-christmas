@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:40:34.176789",
+  "updated_at": "2026-11-25T12:41:05.073689",
   "tables": {
     "users": [
       {
@@ -362,6 +362,11 @@
         "user_id": 1,
         "drink_id": 1,
         "selected_at": "2026-11-25T11:57:25.488691"
+      },
+      {
+        "user_id": 2,
+        "drink_id": 2,
+        "selected_at": "2026-11-25T12:41:05.067147"
       },
       {
         "user_id": 3,
