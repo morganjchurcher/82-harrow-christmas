@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:37:37.932549",
+  "updated_at": "2026-11-25T12:38:07.943473",
   "tables": {
     "users": [
       {
@@ -305,8 +305,8 @@
       },
       {
         "user_id": 2,
-        "choice": "beef_wellington",
-        "voted_at": "2026-11-24T22:43:40.074300"
+        "choice": "trio_pork_wellington",
+        "voted_at": "2026-11-25T12:38:07.928992"
       },
       {
         "user_id": 3,
