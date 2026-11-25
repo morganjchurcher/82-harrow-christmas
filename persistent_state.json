@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:32:04.027141",
+  "updated_at": "2026-11-25T12:33:15.697966",
   "tables": {
     "users": [
       {
@@ -209,14 +209,14 @@
         "created_at": "2026-11-25T12:26:55.497672",
         "recipe_url": "https://www.dailymail.com/lifestyle/food-drink/article-9006661/Marco-Pierre-White-shares-delicious-recipes-hes-dreamed-specially-you.html",
         "recipe_title": "Marco Pierre White shares the delicious recipes he's dreamed up specially for you | Daily Mail Online",
-        "recipe_description": "Britain",
-        "recipe_prep_time": "Not listed",
-        "recipe_cook_time": "Not listed",
-        "recipe_ingredients": "[]",
+        "recipe_description": "Marco said braised red cabbage is the perfect accompaniment for roast turkey \n\nA perfect accompaniment to roast turkey (and other roast birds such as partridge, above).",
+        "recipe_prep_time": "15",
+        "recipe_cook_time": "60",
+        "recipe_ingredients": "[\"1 small red cabbage\", \"150ml (\\u00bcpt) white wine vinegar\", \"250g (9oz) caster sugar\", \"50g (1\\u00beoz) currants\", \"1 apple, peeled and coarsely grated\", \"1 small cinnamon stick\", \"150ml (\\u00bcpt) water\", \"Salt and freshly ground black pepper\"]",
         "recipe_image": "",
         "recipe_added_by": "Morgan",
         "recipe_servings": 9,
-        "recipe_custom_items": "[]"
+        "recipe_custom_items": "[{\"ingredient\": \"small red cabbage\", \"original_text\": \"1 small red cabbage\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.4}, {\"ingredient\": \"( \\u00bcpt) white wine vinegar\", \"original_text\": \"150ml (\\u00bcpt) white wine vinegar\", \"amount_for_7\": \"115 ml\", \"estimated_cost_gbp\": 2.75}, {\"ingredient\": \"(9oz) caster sugar\", \"original_text\": \"250g (9oz) caster sugar\", \"amount_for_7\": \"195 g\", \"estimated_cost_gbp\": 1.15}, {\"ingredient\": \"(1 \\u00beoz) currants\", \"original_text\": \"50g (1\\u00beoz) currants\", \"amount_for_7\": \"40 g\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"apple, peeled and coarsely grated\", \"original_text\": \"1 apple, peeled and coarsely grated\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"small cinnamon stick\", \"original_text\": \"1 small cinnamon stick\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"( \\u00bcpt) water\", \"original_text\": \"150ml (\\u00bcpt) water\", \"amount_for_7\": \"115 ml\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"Salt and freshly ground black pepper\", \"original_text\": \"Salt and freshly ground black pepper\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}]"
       },
       {
         "id": 9,
