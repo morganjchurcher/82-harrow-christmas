@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:33:15.697966",
+  "updated_at": "2026-11-25T12:37:34.647433",
   "tables": {
     "users": [
       {
@@ -300,8 +300,8 @@
     "meat_votes": [
       {
         "user_id": 1,
-        "choice": "gammon",
-        "voted_at": "2026-11-24T22:41:40.710150"
+        "choice": "beef_wellington",
+        "voted_at": "2026-11-25T12:37:34.640824"
       },
       {
         "user_id": 2,
