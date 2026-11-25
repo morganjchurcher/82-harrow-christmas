@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-24T22:43:40.083039",
+  "updated_at": "2026-11-25T11:55:50.839526",
   "tables": {
     "users": [
       {
@@ -40,7 +40,28 @@
         "created_at": 1795560203
       }
     ],
-    "dishes": [],
+    "dishes": [
+      {
+        "id": 1,
+        "title": "Roast Chicken",
+        "category": "Mains",
+        "notes": "",
+        "max_claims": 2,
+        "sort_order": 1,
+        "created_by": 1,
+        "created_at": "2026-11-25T11:55:50.830193",
+        "recipe_url": "",
+        "recipe_title": "",
+        "recipe_description": "",
+        "recipe_prep_time": "",
+        "recipe_cook_time": "",
+        "recipe_ingredients": "[]",
+        "recipe_image": "",
+        "recipe_added_by": "",
+        "recipe_servings": 4,
+        "recipe_custom_items": "[]"
+      }
+    ],
     "claims": [],
     "meat_votes": [
       {
