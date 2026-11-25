@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:27:08.186620",
+  "updated_at": "2026-11-25T12:27:11.623003",
   "tables": {
     "users": [
       {
@@ -381,6 +381,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:27:08.179739"
+      },
+      {
+        "canonical_key": "breadcrumbs",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:11.616200"
       }
     ],
     "settings": [
