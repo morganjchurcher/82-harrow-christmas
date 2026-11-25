@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:27:11.623003",
+  "updated_at": "2026-11-25T12:27:17.827284",
   "tables": {
     "users": [
       {
@@ -389,6 +389,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:27:11.616200"
+      },
+      {
+        "canonical_key": "flour",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:17.817659"
       }
     ],
     "settings": [
