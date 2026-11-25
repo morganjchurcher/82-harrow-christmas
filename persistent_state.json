@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:26:13.243357",
+  "updated_at": "2026-11-25T12:26:17.607693",
   "tables": {
     "users": [
       {
@@ -296,6 +296,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:26:13.236145"
+      },
+      {
+        "canonical_key": "onions",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:26:17.600708"
       }
     ],
     "settings": [
