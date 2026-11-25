@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T13:33:49.379997",
+  "updated_at": "2026-11-25T13:34:14.006395",
   "tables": {
     "users": [
       {
@@ -406,6 +406,11 @@
         "user_id": 3,
         "drink_id": 4,
         "selected_at": "2026-11-25T12:27:35.833978"
+      },
+      {
+        "user_id": 5,
+        "drink_id": 1,
+        "selected_at": "2026-11-25T13:34:13.995417"
       }
     ],
     "ingredient_preferences": [
