@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T12:27:17.827284",
+  "updated_at": "2026-11-25T12:27:23.847956",
   "tables": {
     "users": [
       {
@@ -397,6 +397,14 @@
         "custom_amount": "",
         "custom_base_cost": null,
         "updated_at": "2026-11-25T12:27:17.817659"
+      },
+      {
+        "canonical_key": "veg_sunflower_oil",
+        "store_tier": "budget",
+        "custom_name": "",
+        "custom_amount": "",
+        "custom_base_cost": null,
+        "updated_at": "2026-11-25T12:27:23.838759"
       }
     ],
     "settings": [
