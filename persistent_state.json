@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T12:01:58.506953",
+  "updated_at": "2026-11-25T12:02:10.278891",
   "tables": {
     "users": [
       {
@@ -150,16 +150,16 @@
         "sort_order": 6,
         "created_by": 1,
         "created_at": "2026-11-25T12:01:58.492917",
-        "recipe_url": "",
-        "recipe_title": "",
-        "recipe_description": "",
-        "recipe_prep_time": "",
-        "recipe_cook_time": "",
-        "recipe_ingredients": "[]",
-        "recipe_image": "",
-        "recipe_added_by": "",
-        "recipe_servings": 4,
-        "recipe_custom_items": "[]"
+        "recipe_url": "https://www.bbc.co.uk/food/recipes/sage_and_onion_stuffing_09013",
+        "recipe_title": "Mary Berry's stuffing",
+        "recipe_description": "These traditional sausage meat stuffing balls provide the perfect accompaniment to roast poultry \u2013 especially at Christmas. You can cook them ahead and freeze them and reheat as many as you need.",
+        "recipe_prep_time": "1 hr",
+        "recipe_cook_time": "30 mins",
+        "recipe_ingredients": "[\"40g/1\\u00bdoz butter, plus extra for greasing\", \"1 large onion, finely chopped\", \"700g/1lb 9oz pork sausage meat\", \"150g/5\\u00bdoz fresh white breadcrumbs\", \"1 large unwaxed lemon, juice and finely grated zest\", \"3 tbsp chopped fresh parsley\", \"1 tbsp chopped fresh sage\", \"salt and freshly ground black pepper\", \"1 tbsp vegetable oil\"]",
+        "recipe_image": "https://ichef.bbci.co.uk/food/ic/food_16x9_1600/recipes/sage_and_onion_stuffing_09013_16x9.jpg",
+        "recipe_added_by": "Morgan",
+        "recipe_servings": 16,
+        "recipe_custom_items": "[{\"ingredient\": \"/1 \\u00bdoz butter, plus extra for greasing\", \"original_text\": \"40g/1\\u00bdoz butter, plus extra for greasing\", \"amount_for_7\": \"20 g\", \"estimated_cost_gbp\": 2.15}, {\"ingredient\": \"large onion, finely chopped\", \"original_text\": \"1 large onion, finely chopped\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.1}, {\"ingredient\": \"/1lb 9oz pork sausage meat\", \"original_text\": \"700g/1lb 9oz pork sausage meat\", \"amount_for_7\": \"305 g\", \"estimated_cost_gbp\": 3.0}, {\"ingredient\": \"/5 \\u00bdoz fresh white breadcrumbs\", \"original_text\": \"150g/5\\u00bdoz fresh white breadcrumbs\", \"amount_for_7\": \"65 g\", \"estimated_cost_gbp\": 1.15}, {\"ingredient\": \"large unwaxed lemon, juice and finely grated zest\", \"original_text\": \"1 large unwaxed lemon, juice and finely grated zest\", \"amount_for_7\": \"1\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"chopped fresh parsley\", \"original_text\": \"3 tbsp chopped fresh parsley\", \"amount_for_7\": \"1.5 tbsp\", \"estimated_cost_gbp\": 0.6}, {\"ingredient\": \"chopped fresh sage\", \"original_text\": \"1 tbsp chopped fresh sage\", \"amount_for_7\": \"0.5 tbsp\", \"estimated_cost_gbp\": 0.45}, {\"ingredient\": \"salt and freshly ground black pepper\", \"original_text\": \"salt and freshly ground black pepper\", \"amount_for_7\": \"Scaled for 7 (1x pack/to taste)\", \"estimated_cost_gbp\": 1.5}, {\"ingredient\": \"vegetable oil\", \"original_text\": \"1 tbsp vegetable oil\", \"amount_for_7\": \"0.5 tbsp\", \"estimated_cost_gbp\": 0.65}]"
       }
     ],
     "claims": [
