@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-26T19:07:44.841709",
+  "updated_at": "2026-11-26T19:08:01.603370",
   "tables": {
     "users": [
       {
@@ -356,6 +356,11 @@
         "user_id": 3,
         "choice": "lamb",
         "voted_at": "2026-11-25T12:27:59.643116"
+      },
+      {
+        "user_id": 4,
+        "choice": "gammon",
+        "voted_at": "2026-11-26T19:08:01.596675"
       }
     ],
     "drinks": [
