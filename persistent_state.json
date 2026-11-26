@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-11-25T13:34:14.006395",
+  "updated_at": "2026-11-26T19:07:44.841709",
   "tables": {
     "users": [
       {
@@ -49,7 +49,7 @@
         "can_edit_dishes": 0,
         "avatar_color": "#8e44ad",
         "created_at": "2026-11-25T13:08:25.379017",
-        "last_login_at": "2026-11-25T13:08:25.379017"
+        "last_login_at": "2026-11-26T19:07:44.834812"
       },
       {
         "id": 5,
@@ -94,6 +94,11 @@
         "token": "SNqSkI-jHrsmLyzO7n_I07ZRZP85W0EpD0-FAJleuKU",
         "user_id": 5,
         "created_at": 1795613629
+      },
+      {
+        "token": "6ZyPSWTsnzy5cBHWgN7zbv6Hv7LrrDQgcBH-Q8xz9lg",
+        "user_id": 4,
+        "created_at": 1795720064
       }
     ],
     "dishes": [
